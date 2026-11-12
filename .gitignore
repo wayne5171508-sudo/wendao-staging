@@ -1,0 +1,12 @@
+# macOS 與外接碟產生的檔案
+.DS_Store
+._*
+# 暫存、備份、記錄
+*.bak
+*.tmp
+*.log
+# firebase CLI 本機產生的檔案
+node_modules/
+.firebase/
+# 遊戲匯出的存檔（不要推上 GitHub）
+問道青冥存檔-*.json

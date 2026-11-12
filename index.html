@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b121c">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="問道青冥">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>【測試】問道青冥</title><meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect x=%224%22 y=%224%22 width=%2256%22 height=%2256%22 rx=%228%22 fill=%22%23b3261e%22/%3E%3Ctext x=%2232%22 y=%2245%22 font-size=%2236%22 text-anchor=%22middle%22 fill=%22%23fff4ea%22 font-family=%22serif%22%3E%E9%81%93%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body><div id="stagingTag" style="position:fixed;top:42%;left:0;z-index:2147483647;pointer-events:none;writing-mode:vertical-rl;background:#d81e28;color:#fff;font:700 11px/1 sans-serif;letter-spacing:2px;padding:6px 3px;border-radius:0 4px 4px 0;box-shadow:0 1px 4px rgba(0,0,0,.5);opacity:.92">測試版</div>
+<div id="loader"><b>問道青冥</b><div class="ld-bar"><i id="ldBar"></i></div><span id="ldTxt">載入中 0%</span></div>
+<div id="app" class="title-mode">
+  <section id="scene">
+    <div class="bg" id="bgA"></div><div class="bg" id="bgB"></div>
+    <div id="sceneContent"></div>
+    <canvas id="fx"></canvas>
+    <header id="hud">
+      <div id="hudRealm"><span class="seal-sm" id="hudSeal">練</span><div><b id="hudLv"></b><small id="hudRoot"></small></div></div>
+      <div id="hudRes"><span><img class="stone-ico" src="assets/ui/stone.webp" alt="靈石"><b id="hudStone">0</b></span><button id="btnBag" class="sealBtn bag" aria-label="行囊"><img src="assets/ui/bag.webp" alt="" onerror="this.remove()"><b>囊</b></button><button id="btnMute" class="sealBtn mute" aria-label="靜音">聲</button><button id="btnSet" class="sealBtn" aria-label="設定">閣</button></div>
+    </header>
+  </section>
+  <section id="controls">
+    <div id="ctrlContent"></div>
+    <nav id="nav">
+      <button data-tab="home"><b>洞</b><small>洞府</small></button>
+      <button data-tab="map"><b>歷</b><small>歷練</small></button>
+      <button data-tab="alch"><b>丹</b><small>丹房</small></button>
+      <button data-tab="arts"><b>功</b><small>功法</small></button>
+      <button data-tab="gear"><b>寶</b><small>法寶</small></button>
+      <button data-tab="draw"><b>緣</b><small>機緣</small></button>
+    </nav>
+  </section>
+  <div id="dlg" class="hidden"><div id="dlgName"></div><div id="dlgText"></div><i id="dlgNext">▼</i></div>
+  <div id="modal" class="hidden"><div class="scroll"><div class="roller"></div><h3 id="mTitle"></h3><div id="mBody"></div><div class="roller"></div></div></div>
+  <button id="skipBtn" class="seal sm ghost hidden">跳過</button>
+  <div id="toasts"></div>
+  <div id="fade"></div>
+</div>
+<script src="js/asset-list.js"></script>
+<script src="js/data.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/state.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/aura.js"></script>
+<script src="js/story.js"></script>
+<script src="js/halo.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/dao.js"></script>
+<script src="js/cloud.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

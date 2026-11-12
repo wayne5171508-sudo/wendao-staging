@@ -1,0 +1,1021 @@
+:root {
+  --ink: #0b121c; --ink2: #121c29; --paper: #e9e4d6; --dim: #93a0a8; --gold: #d8c48a; --gold2: #f2e2b0; --goldline: rgba(216,196,138,.42);
+  --cinnabar: #b3261e; --cinnabar2: #d8443a; --qi: #8fd6e8;
+  --brush: "LXGW WenKai TC","Kaiti TC","STKaiti","BiauKai","DFKai-SB","Songti TC",serif;
+  --serif: "Songti TC","Noto Serif TC","PMingLiU",serif;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #05080d; color: var(--paper); font-family: var(--serif); -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+button { font-family: var(--brush); color: inherit; cursor: pointer; border: none; background: none; padding: 0; }
+button:focus-visible { outline: 2px solid var(--gold2); outline-offset: 3px; }
+.hidden { display: none !important; }
+
+/* ───── 版面：直式上下疊、橫式左右並排 ───── */
+#app { position: fixed; inset: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); background: var(--ink); }   /* 欄寬鎖在視窗內：內容（例如 input 的預設寬度）不能把直式版面撐寬 */
+#scene { position: relative; overflow: hidden; min-height: 0; }
+#controls { position: relative; display: flex; flex-direction: column; min-height: 0; max-height: 58vh; background: linear-gradient(#101925, #0b121c); border-top: 1px solid var(--goldline); }
+#ctrlContent { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 8px; }
+@media (orientation: landscape) {
+  #app { grid-template-rows: none; grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); }
+  #controls { max-height: none; border-top: none; border-left: 1px solid var(--goldline); }
+}
+#app.title-mode, #app.story-mode { grid-template-rows: 1fr 0; grid-template-columns: 1fr 0; }
+#app.title-mode #controls, #app.story-mode #controls, #app.title-mode #hud, #app.story-mode #hud { display: none; }
+
+.bg { position: absolute; inset: 0; background: center / cover no-repeat; transition: opacity 1s ease; }
+.bg.grade-wild { filter: brightness(.82); }
+.bg.grade-realm { filter: brightness(.78); }
+.bg.grade-dim { filter: brightness(.55) saturate(.8); }
+#scene::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 55%, transparent 55%, rgba(4,7,12,.55)); }
+#sceneContent { position: absolute; inset: 0; }   /* 不設 z-index：讓光環、法相的螢幕混色能疊到背景圖上 */
+#fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+
+/* ───── 頂部狀態 ───── */
+#hud { position: absolute; left: 0; right: 0; top: 0; z-index: 3; display: flex; justify-content: space-between; align-items: center; padding: max(10px, env(safe-area-inset-top)) 12px 18px; background: linear-gradient(rgba(5,8,14,.78), rgba(5,8,14,0)); }
+#hudRealm { display: flex; gap: 8px; align-items: center; }
+#hudRealm b { display: block; font-family: var(--brush); font-size: 19px; color: var(--gold2); letter-spacing: 2px; text-shadow: 0 1px 3px #000; }
+#hudRealm small { display: block; font-size: 11px; color: var(--dim); }
+#hudRealm b { white-space: nowrap; }   /* 境界名不拆行 */
+#hudRealm small { text-wrap: balance; word-break: keep-all; }   /* 只在「・」或空白處換行，不拆開「（玄品）」 */
+@media (max-width: 359px) { #hudRealm b { font-size: 17px; letter-spacing: 1px; } #hudRes { gap: 6px; } }   /* 320 寬：頂列擠，境界名縮一點 */
+#hudRes { display: flex; align-items: center; gap: 10px; }
+#hudRes span { display: flex; align-items: center; gap: 5px; font-family: var(--brush); font-size: 16px; color: var(--paper); text-shadow: 0 1px 3px #000; }
+.seal-sm { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; font-family: var(--brush); font-size: 18px; font-weight: 700; color: #fff4ea; background: var(--cinnabar); border-radius: 3px; box-shadow: inset 0 0 0 2px var(--cinnabar), inset 0 0 0 3px rgba(255,230,210,.5); transform: rotate(-3deg); }
+.ico { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; align-items: center; justify-content: center; font-style: normal; font-family: var(--brush); font-size: 12px; font-weight: 700; color: #0b121c; background: radial-gradient(circle at 35% 30%, #fff, var(--c) 55%, rgba(0,0,0,.55)); box-shadow: 0 0 8px var(--c); flex: none; }
+.sealBtn { width: 38px; height: 38px; border: 2px solid var(--cinnabar2); color: var(--cinnabar2); font-size: 19px; font-weight: 700; border-radius: 5px; background: rgba(8,12,20,.55); transform: rotate(-2deg); box-shadow: inset 0 0 0 2px rgba(8,12,20,.8), inset 0 0 0 3px rgba(216,68,58,.4); }
+
+/* ───── 底部印章導覽（拇指區） ───── */
+#nav { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 6px 8px calc(6px + var(--safe-b)); border-top: 1px solid rgba(216,196,138,.2); background: rgba(5,8,14,.6); }
+#nav button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 0; min-height: 56px; }
+#nav b { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 20px; border: 1.5px solid rgba(216,68,58,.55); color: rgba(216,68,58,.85); border-radius: 4px; transition: background .2s, color .2s; }
+#nav small { font-size: 11px; color: var(--dim); font-family: var(--serif); }
+#nav button.on b { background: var(--cinnabar); color: #fff4ea; border-color: var(--cinnabar); box-shadow: inset 0 0 0 2px var(--cinnabar), inset 0 0 0 3px rgba(255,230,210,.5); transform: rotate(-3deg); }
+#nav button.on small { color: var(--gold2); }
+#nav button.locked { opacity: .3; pointer-events: none; }
+#nav button .dot { position: absolute; }
+
+/* ───── 主要印章按鈕 ───── */
+.seal { position: relative; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; min-width: 96px; min-height: 64px; padding: 10px 20px; font-size: 24px; font-weight: 700; letter-spacing: .2em; color: #fff4ea; border-radius: 6px;
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.1), transparent 55%), var(--cinnabar);
+  box-shadow: inset 0 0 0 3px var(--cinnabar), inset 0 0 0 5px rgba(255,230,210,.55), 0 6px 18px rgba(0,0,0,.55); transform: rotate(-2deg); transition: transform .15s, filter .15s; }
+.seal::after { content: ""; position: absolute; inset: 0; border-radius: 6px; pointer-events: none; background: radial-gradient(circle at 15% 80%, rgba(0,0,0,.2) 0 3px, transparent 4px), radial-gradient(circle at 82% 22%, rgba(0,0,0,.16) 0 2px, transparent 3px), radial-gradient(circle at 60% 88%, rgba(255,255,255,.12) 0 2px, transparent 3px); }
+.seal small { font-family: var(--serif); font-size: 12px; letter-spacing: 1px; font-weight: 400; opacity: .9; margin-top: 2px; }
+.seal:active { transform: rotate(0) scale(.96); }
+.seal:disabled { filter: grayscale(.85) brightness(.55); }
+.seal.ghost { background: rgba(8,12,20,.5); color: var(--cinnabar2); box-shadow: inset 0 0 0 2px var(--cinnabar2), inset 0 0 0 4px rgba(8,12,20,.8), inset 0 0 0 5px rgba(216,68,58,.45); }
+.seal.sm { min-width: 58px; min-height: 44px; padding: 6px 12px; font-size: 18px; letter-spacing: .1em; }
+.seal.glow { animation: sealGlow 1.3s ease-in-out infinite alternate; }
+@keyframes sealGlow { to { filter: drop-shadow(0 0 14px rgba(255,200,140,.85)); } }
+
+/* ───── 洞府 ───── */
+.hero-stage { position: absolute; left: 50%; bottom: 4%; height: 64%; transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; }
+.hero-stage img { height: 100%; filter: drop-shadow(0 10px 18px rgba(0,0,0,.6)); animation: breathe 4.2s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes breathe { 50% { transform: translateY(-4px) scale(1.008); } }
+.aura { position: absolute; left: 50%; bottom: 6%; width: 120%; aspect-ratio: 1; transform: translate(-50%, 25%); border-radius: 50%; background: radial-gradient(circle, rgba(143,214,232,.32), rgba(143,214,232,0) 60%); animation: auraPulse 3s ease-in-out infinite; pointer-events: none; }
+@keyframes auraPulse { 50% { opacity: .55; transform: translate(-50%, 25%) scale(1.06); } }
+.cult { display: grid; gap: 10px; }
+.cult-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.cult-head h2 { margin: 0; font-family: var(--brush); font-size: 26px; color: var(--gold2); letter-spacing: 3px; }
+.cult-head span { font-size: 13px; color: var(--qi); white-space: nowrap; }
+.bar { position: relative; height: 14px; border: 1px solid var(--goldline); background: linear-gradient(#04070c, #0d141e); }
+.bar::before, .bar::after { content: ""; position: absolute; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; background: var(--gold); transform: rotate(45deg); z-index: 2; }
+.bar::before { left: -4px; } .bar::after { right: -4px; }
+.bar > i { position: absolute; left: 0; top: 0; bottom: 0; transition: width .3s; }
+.bar > i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(255,255,255,.28), transparent 50%, rgba(0,0,0,.2)); }
+.bar > span { position: absolute; inset: 0; font-size: 10px; line-height: 13px; text-align: center; font-family: system-ui, sans-serif; text-shadow: 0 1px 2px #000; z-index: 1; }
+.bar.xp > i { background: linear-gradient(90deg, #5d4a1c, #c9a24a 70%, #f2dc94); box-shadow: 0 0 10px rgba(230,200,120,.5); }
+.bar.hp > i { background: linear-gradient(90deg, #5e1018, #c23a44); }
+.bar.mp > i { background: linear-gradient(90deg, #0f3460, #3f8fd0); }
+.bar.boss > i { background: linear-gradient(90deg, #4a0710, #c0283c 70%, #ff6a7a); }
+.row { display: flex; gap: 10px; align-items: center; }
+.row.center { justify-content: center; }
+.row.spread { justify-content: space-between; }
+.note { font-size: 13px; color: var(--dim); line-height: 1.6; margin: 0; }
+.primary-zone { display: flex; justify-content: center; align-items: center; gap: 14px; padding: 6px 0 2px; }
+.stats-line { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; }
+.stats-line div { font-size: 11px; color: var(--dim); }
+.stats-line b { display: block; font-family: var(--brush); font-size: 17px; color: var(--paper); font-weight: 400; }
+
+/* ───── 清單（卷軸條列，不用卡片格） ───── */
+.list { display: grid; }
+.li { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 12px 2px; border-bottom: 1px solid rgba(216,196,138,.14); }
+.li:last-child { border-bottom: none; }
+.li h4 { margin: 0 0 2px; font-family: var(--brush); font-size: 19px; color: var(--gold2); font-weight: 400; letter-spacing: 1px; }
+.li h4 em { font-style: normal; font-family: var(--serif); font-size: 12px; color: var(--dim); margin-left: 8px; letter-spacing: 0; }
+.li p { margin: 0; font-size: 12.5px; color: var(--dim); line-height: 1.5; }
+.li .ico { width: 38px; height: 38px; font-size: 16px; }
+.li.locked { opacity: .45; }
+.li.done h4::after { content: "  ✓"; color: #9fe8b8; font-size: 14px; }
+.mat { display: inline-block; font-size: 12px; margin: 4px 6px 0 0; padding: 1px 7px; color: #b8f0c8; border: 1px solid rgba(184,240,200,.3); }
+.mat.lack { color: #ff9a9a; border-color: rgba(255,120,120,.3); }
+.sec-title { display: flex; align-items: center; gap: 10px; margin: 4px 0 6px; font-family: var(--brush); font-size: 22px; color: var(--gold2); letter-spacing: 6px; }
+.sec-title::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--goldline), transparent); }
+.tabs { display: flex; gap: 8px; margin-bottom: 6px; }
+.tabs button { flex: 1; padding: 8px 0; font-size: 16px; color: var(--dim); border-bottom: 2px solid transparent; }
+.tabs button.on { color: var(--gold2); border-color: var(--cinnabar2); }
+
+/* ───── 地圖 ───── */
+.region { position: relative; display: block; width: 100%; height: 92px; margin-bottom: 10px; border: 1px solid var(--goldline); background: center / cover no-repeat; text-align: left; overflow: hidden; }
+.region::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(5,8,14,.9), rgba(5,8,14,.35) 70%, rgba(5,8,14,.15)); }
+.region > * { position: relative; }
+.region h4 { margin: 14px 0 2px 16px; font-family: var(--brush); font-size: 26px; color: #f4efe0; font-weight: 400; letter-spacing: 6px; text-shadow: 0 2px 4px #000; }
+.region p { margin: 0 0 0 16px; font-family: var(--serif); font-size: 12.5px; color: var(--gold); }
+.region .prog { position: absolute; right: 14px; bottom: 10px; font-family: var(--serif); font-size: 12px; color: var(--paper); }
+.region.locked { filter: grayscale(1) brightness(.55); pointer-events: none; }
+.region.locked .prog::before { content: "未解鎖　"; }
+.region.cur { box-shadow: 0 0 0 1px var(--gold2), 0 0 16px rgba(242,226,176,.3); }
+
+/* ───── 戰鬥 ───── */
+.mon { position: absolute; left: 50%; top: 9%; height: 52%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+.mon img { height: 100%; filter: var(--tint,) drop-shadow(0 12px 22px rgba(0,0,0,.7)); animation: monIdle 2.6s ease-in-out infinite; transform-origin: 50% 100%; transition: filter .08s; }
+.mon.boss { height: 60%; top: 6%; }
+.mon.hit img { filter: var(--tint,) brightness(2.6) drop-shadow(0 0 18px #fff); }
+.mon.dead img { animation: monDie .7s ease-in forwards; }
+.mon.enter img { animation: monEnter .5s ease-out; }
+.mon.enrage img { filter: var(--tint,) drop-shadow(0 0 22px rgba(255,40,50,.85)) drop-shadow(0 12px 22px rgba(0,0,0,.7)); }
+@keyframes monIdle { 50% { transform: translateY(-6px) scale(1.01); } }
+@keyframes monDie { to { opacity: 0; transform: translateY(20px) scale(.92); filter: brightness(0) blur(6px); } }
+@keyframes monEnter { from { opacity: 0; transform: translateY(-24px) scale(.94); filter: blur(6px); } }
+.mon-hud { position: absolute; left: 50%; top: calc(max(10px, env(safe-area-inset-top)) + 52px); width: min(78%, 360px); transform: translateX(-50%); z-index: 3; text-align: center; }
+.mon-hud h5 { margin: 0 0 4px; font-family: var(--brush); font-size: 19px; color: #ffb0b0; letter-spacing: 3px; font-weight: 400; text-shadow: 0 1px 4px #000; }
+.mon-hud h5 em { font-style: normal; font-size: 12px; color: var(--gold); margin-left: 6px; }
+.charge { margin-top: 6px; height: 6px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,90,90,.6); }
+.charge i { display: block; height: 100%; background: linear-gradient(90deg, #ff4a4a, #ffb08a); }
+.charge-tip { display: inline-block; font-size: 13px; color: #ffb4b4; margin-top: 5px; padding: 3px 10px; font-family: var(--brush); background: rgba(40,6,8,.78); border: 1px solid rgba(255,90,90,.45); border-radius: 3px; }
+.hero-b { position: absolute; left: 50%; bottom: -2%; height: 40%; transform: translateX(-50%); }
+.hero-b img { height: 100%; filter: drop-shadow(0 6px 14px rgba(0,0,0,.7)); transform-origin: 50% 100%; }
+.hero-b.atk img { animation: lunge .22s ease-out; }
+@keyframes lunge { 40% { transform: translateY(-16%) scale(.97); } }
+.hero-b.hurt img { animation: hurt .25s; }
+@keyframes hurt { 30% { transform: translateX(-6px); filter: brightness(1.8) sepia(1) hue-rotate(-40deg) saturate(4); } 70% { transform: translateX(5px); } }
+.shield { position: absolute; left: 50%; bottom: 0; width: 64%; aspect-ratio: .8; transform: translateX(-50%); border-radius: 50%; border: 2px solid rgba(143,240,216,.7); background: radial-gradient(circle, rgba(143,240,216,.06), rgba(143,240,216,.18)); box-shadow: 0 0 22px rgba(143,240,216,.5); animation: shieldPulse 1s ease-in-out infinite alternate; }
+.bstat { display: grid; gap: 6px; }
+.bstat .lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--dim); }
+.skills { display: grid; grid-template-columns: repeat(var(--n, 4), 1fr); gap: 10px; padding: 8px 2px 4px; }
+.skill { position: relative; aspect-ratio: 1; max-width: 84px; justify-self: center; width: 100%; border-radius: 50%; font-size: 26px; color: var(--c); font-weight: 700;
+  background: radial-gradient(circle at 50% 40%, rgba(255,255,255,.08), #0a111b 70%); border: 1px solid rgba(216,196,138,.6);
+  box-shadow: 0 0 0 3px rgba(8,13,21,.85), 0 0 0 4px rgba(216,196,138,.28), 0 4px 14px rgba(0,0,0,.6); }
+.skill b { position: relative; z-index: 1; text-shadow: 0 0 12px var(--c); }
+.skill small { position: absolute; left: 0; right: 0; bottom: -18px; font-family: var(--serif); font-size: 11px; color: var(--dim); font-weight: 400; }
+.skill .cd { position: absolute; inset: 0; border-radius: 50%; z-index: 2; background: conic-gradient(rgba(4,7,12,.8) var(--p, 0deg), transparent 0); }
+.skill .cdt { position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center; font-family: system-ui; font-size: 16px; color: #fff; text-shadow: 0 0 4px #000; }
+.skill.ready { border-color: var(--c); box-shadow: 0 0 0 3px rgba(8,13,21,.85), 0 0 0 4px var(--c), 0 0 16px var(--c); }
+.skill.nomp b { opacity: .35; }
+.skill.locked { background: #121820; color: #4a5562; border-color: rgba(120,130,140,.4); box-shadow: none; }
+.skill.locked b { text-shadow: none; }
+.battle-top { position: absolute; left: 12px; top: calc(max(10px, env(safe-area-inset-top))); z-index: 4; display: flex; gap: 8px; align-items: center; }
+.wave-tag { font-family: var(--brush); font-size: 14px; color: var(--gold2); text-shadow: 0 1px 3px #000; }
+
+/* ───── 煉丹 ───── */
+
+/* ───── 法寶 ───── */
+.slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+.slot-box { text-align: center; padding: 10px 4px; border: 1px solid var(--goldline); background: rgba(5,8,14,.4); }
+.slot-box small { display: block; font-size: 11px; color: var(--dim); }
+.slot-box b { display: block; font-family: var(--brush); font-size: 16px; font-weight: 400; margin-top: 4px; }
+.tier { font-size: 11px; padding: 0 5px; border: 1px solid currentColor; margin-left: 6px; font-family: var(--serif); font-style: normal; }
+
+/* ───── 對話與劇情 ───── */
+#dlg { position: absolute; left: 50%; bottom: calc(18px + var(--safe-b)); transform: translateX(-50%); width: min(94%, 760px); min-height: 136px; z-index: 6; padding: 22px 22px 18px; background: linear-gradient(rgba(10,16,28,.94), rgba(6,10,18,.96)); border-top: 1px solid var(--goldline); border-bottom: 1px solid var(--goldline); box-shadow: 0 10px 30px rgba(0,0,0,.6); cursor: pointer; }
+#dlgName { position: absolute; top: -16px; left: 16px; padding: 3px 14px; font-family: var(--brush); font-size: 18px; font-weight: 700; color: #fff4ea; background: var(--cinnabar); box-shadow: inset 0 0 0 2px var(--cinnabar), inset 0 0 0 3px rgba(255,230,210,.5); letter-spacing: 3px; transform: rotate(-1.5deg); }
+#dlgName:empty { display: none; }
+#dlgText { font-family: var(--brush); font-size: clamp(17px, 4.4vw, 21px); line-height: 1.75; letter-spacing: 1px; color: #f1ede2; min-height: 3.5em; }
+#dlg.narr #dlgText { text-align: center; font-size: clamp(18px, 4.8vw, 23px); color: #dfe8ee; }
+#dlgNext { position: absolute; right: 16px; bottom: 8px; font-style: normal; font-size: 12px; color: var(--gold); animation: bob 1s infinite alternate; }
+@keyframes bob { to { transform: translateY(4px); } }
+@keyframes swirl { to { transform: rotate(360deg); } }
+.char { transition: opacity .3s, filter .3s; }
+.char.listen { opacity: 1; filter: saturate(.55) brightness(.48); }
+.char { position: absolute; bottom: 0; height: 62%; transition: opacity .6s; }
+.char img { height: 100%; filter: drop-shadow(0 8px 16px rgba(0,0,0,.6)); }
+.card { position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(ellipse, rgba(10,16,28,.88), rgba(2,4,8,.97)); animation: cardIn 3.2s ease forwards; pointer-events: none; }
+.card b { font-family: var(--brush); font-size: clamp(30px, 8vw, 54px); letter-spacing: .4em; color: var(--gold2); text-shadow: 0 0 26px rgba(216,196,138,.6); font-weight: 400; }
+.card span { margin-top: 14px; padding: 6px 30px; font-family: var(--brush); font-size: clamp(24px, 6.5vw, 42px); letter-spacing: .3em; border-top: 1px solid var(--goldline); border-bottom: 1px solid var(--goldline); }
+@keyframes cardIn { 0% { opacity: 0; } 15% { opacity: 1; } 82% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ───── 標題 ───── */
+.tlogo { position: absolute; top: 8%; right: 9%; display: flex; flex-direction: row-reverse; gap: 14px; }
+.tlogo h1 { margin: 0; writing-mode: vertical-rl; font-family: var(--brush); font-weight: 700; font-size: clamp(54px, 11vh, 110px); letter-spacing: .12em; color: #f4f6f2; line-height: 1; }
+.tlogo h1 span { display: inline-block; opacity: 0; filter: blur(12px); text-shadow: 0 0 22px rgba(170,220,255,.55), 3px 4px 0 rgba(0,0,0,.35); animation: ink 2.2s cubic-bezier(.2,.7,.2,1) forwards; }
+.tlogo h1 span:nth-child(2) { animation-delay: .4s; } .tlogo h1 span:nth-child(3) { animation-delay: .8s; } .tlogo h1 span:nth-child(4) { animation-delay: 1.2s; }
+@keyframes ink { 0% { opacity: 0; filter: blur(14px); transform: scale(1.2); } 100% { opacity: 1; filter: blur(0); transform: none; } }
+.tlogo p { writing-mode: vertical-rl; margin: 1em 0 0; font-family: var(--brush); font-size: clamp(15px, 2.4vh, 22px); letter-spacing: .5em; color: var(--gold); opacity: 0; animation: fadeIn 2s 2s forwards; text-shadow: 0 1px 6px #000; }
+@keyframes fadeIn { to { opacity: 1; } }
+.tbtns { position: absolute; left: 8%; bottom: calc(10% + var(--safe-b)); display: flex; gap: 18px; align-items: flex-end; opacity: 0; animation: fadeIn 1.4s 2.4s forwards; }
+.tbtns .seal { width: 104px; height: 104px; padding: 0; font-size: 34px; writing-mode: vertical-rl; letter-spacing: .05em; }
+.tbtns .seal.ghost { width: 86px; height: 86px; font-size: 28px; }
+.tbtns .cap { position: absolute; bottom: -24px; left: 0; right: 0; text-align: center; writing-mode: horizontal-tb; font-family: var(--serif); font-size: 12px; letter-spacing: 3px; color: var(--gold2); text-shadow: 0 1px 4px #000; transform: rotate(2deg); }
+#saveInfo { position: absolute; left: 0; top: -30px; white-space: nowrap; font-size: 12px; color: var(--dim); text-shadow: 0 1px 4px #000; }
+@media (orientation: landscape) { .tlogo { right: auto; left: 9%; } .tbtns { left: 34%; bottom: calc(12% + var(--safe-b)); } }
+
+/* ───── 卷軸彈窗 ───── */
+#modal { position: absolute; inset: 0; z-index: 9; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(3,5,9,.66); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+.scroll { position: relative; width: min(100%, 440px); max-height: 86%; display: flex; flex-direction: column; padding: 22px 20px 20px; background: linear-gradient(#0d1520, #141e2b); box-shadow: inset 0 0 0 1px var(--goldline), inset 0 0 0 5px rgba(8,13,21,.9), inset 0 0 0 6px rgba(216,196,138,.18), 0 0 50px rgba(0,0,0,.8); animation: unroll .4s cubic-bezier(.2,.8,.2,1); }
+@keyframes unroll { from { clip-path: inset(48% 0 48% 0); } to { clip-path: inset(0); } }
+.scroll .roller { position: absolute; left: -8px; right: -8px; height: 14px; border-radius: 7px; background: linear-gradient(#5a3a20, #8a6034 45%, #3a2412); }
+.scroll .roller:first-child { top: -6px; } .scroll .roller:last-child { bottom: -6px; }
+#mTitle { margin: 0 0 10px; text-align: center; font-family: var(--brush); font-size: 26px; letter-spacing: 10px; color: var(--gold2); font-weight: 400; }
+#mBody { overflow-y: auto; font-size: 14px; line-height: 1.7; flex: 1 1 auto; min-height: 0; }   /* 彈窗內容可縮、超出才捲動，標題不被擠出畫面 */
+#mBody .big { font-family: var(--brush); font-size: 22px; text-align: center; color: var(--paper); margin: 6px 0; }
+#mBody .row { margin-top: 14px; }
+
+/* ───── 提示 ───── */
+#toasts { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); z-index: 9; display: grid; gap: 6px; justify-items: center; width: 92%; pointer-events: none; }
+.toast { padding: 7px 30px; font-family: var(--brush); font-size: 16px; background: linear-gradient(90deg, transparent, rgba(6,10,18,.9) 15%, rgba(6,10,18,.9) 85%, transparent); border-top: 1px solid rgba(216,196,138,.3); border-bottom: 1px solid rgba(216,196,138,.3); text-align: center; animation: toastIn .3s ease; transition: opacity .5s; }
+.toast.out { opacity: 0; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-8px); } }
+.banner { position: absolute; left: 0; right: 0; top: 30%; z-index: 5; text-align: center; pointer-events: none; animation: banner 3.4s ease forwards; }
+.banner b { display: block; font-family: var(--brush); font-size: clamp(34px, 9vw, 64px); letter-spacing: .3em; color: #f8f0d4; text-shadow: 0 0 28px rgba(216,196,138,.75), 0 2px 4px #000; font-weight: 700; }
+.banner span { display: inline-block; margin-top: 8px; padding: 4px 26px; font-size: 14px; letter-spacing: 3px; border-top: 1px solid var(--goldline); color: #dfe6ea; text-shadow: 0 1px 3px #000; }
+@keyframes banner { 0% { opacity: 0; transform: scale(1.15); filter: blur(8px); } 12% { opacity: 1; transform: none; filter: none; } 78% { opacity: 1; } 100% { opacity: 0; } }
+#fade { position: absolute; inset: 0; z-index: 10; background: #000; opacity: 0; pointer-events: none; transition: opacity .45s; }
+#fade.on { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+
+/* 直式標題：把山巔宮闕推到畫面偏左，讓右側直書標題不壓圖 */
+@media (orientation: portrait) { #app.title-mode .bg { background-position: 97% 42% !important; } }
+/* 捲軸內的捲動條：細墨線，不出現系統白條 */
+#mBody, #ctrlContent { scrollbar-width: thin; scrollbar-color: rgba(216,196,138,.35) transparent; overflow-x: hidden; }
+#mBody::-webkit-scrollbar, #ctrlContent::-webkit-scrollbar { width: 4px; }
+#mBody::-webkit-scrollbar-thumb, #ctrlContent::-webkit-scrollbar-thumb { background: rgba(216,196,138,.35); border-radius: 2px; }
+#mBody::-webkit-scrollbar-track, #ctrlContent::-webkit-scrollbar-track { background: transparent; }
+#mBody { padding: 4px 6px 10px; }
+/* 清單畫面：控制區拉高，畫作留在上方三分之一 */
+@media (orientation: portrait) { #app.tall #controls { max-height: 68vh; height: 68vh; } #app.tall.fit #controls { height: auto; } }
+/* 戰鬥中改用戰鬥自己的頂列，避免與 HUD 重疊 */
+#app.fighting #hud { display: none; }
+#app.fighting .battle-top { padding: 4px 10px 4px 4px; background: linear-gradient(90deg, rgba(5,8,14,.7), rgba(5,8,14,0)); border-radius: 4px; }
+/* 亮背景時 HUD 副標不被吃掉 */
+#hudRoot { text-shadow: 0 1px 3px #000, 0 0 6px #000; }
+
+/* ───── 補充素材：打坐、施法、NPC 立繪 ───── */
+.hero-stage.sit { height: 46%; bottom: 27%; }
+.hero-stage.sit img { animation-duration: 5.5s; }
+.hero-stage.cast { height: 76%; bottom: 0; }
+.hero-stage.cast img { animation: none; filter: drop-shadow(0 10px 18px rgba(0,0,0,.6)); }
+.hero-stage.gear { left: 40%; }
+.char.npc { right: 2%; left: auto; }
+.char { z-index: 2; }
+.char.listen { z-index: 1; }
+@media (orientation: portrait) { #app.story-mode .char { height: 52%; } #app.story-mode .char.hero { left: -2% !important; } #app.story-mode .char.npc { right: -4%; } }
+.char.npc.enter img { animation: npcIn .45s ease-out; }
+@keyframes npcIn { from { opacity: 0; transform: translateX(24px); } }
+.cutin { position: absolute; left: -12%; bottom: 2%; height: 58%; z-index: 4; pointer-events: none; animation: cutin .9s cubic-bezier(.2,.8,.2,1) forwards; }
+.cutin::before { content: ""; position: absolute; left: -10%; right: -40%; top: 28%; bottom: 18%; background: linear-gradient(90deg, rgba(5,8,14,0), rgba(5,8,14,.55) 30%, rgba(5,8,14,0)); border-top: 1px solid var(--c); border-bottom: 1px solid var(--c); transform: skewY(-6deg); }
+.cutin img { position: relative; height: 100%; filter: drop-shadow(0 0 18px var(--c)); }
+@keyframes cutin { 0% { opacity: 0; transform: translateX(-40%); } 18% { opacity: 1; transform: translateX(0); } 70% { opacity: 1; transform: translateX(4%); } 100% { opacity: 0; transform: translateX(10%); } }
+/* 劍氣橫掃：新月形光弧（只用漸層與遮罩，不用圖），由 Battle.qiSweep 以 transform/opacity 推向妖物 */
+.qi-sweep { position: absolute; width: 120px; height: 120px; z-index: 4; pointer-events: none; border-radius: 50%; opacity: 0; mix-blend-mode: screen; will-change: transform, opacity;
+  background: radial-gradient(closest-side, transparent 55%, color-mix(in srgb, var(--c) 70%, transparent) 64%, #fff 70%, var(--c) 75%, transparent 86%);
+  /* 弧口朝 +x（行進方向）：conic 由上方順時針量角，90deg 為右 */
+  -webkit-mask-image: conic-gradient(transparent 0 25deg, #000 55deg 125deg, transparent 155deg); mask-image: conic-gradient(transparent 0 25deg, #000 55deg 125deg, transparent 155deg); }
+[data-fx="high"] .qi-sweep:not(.ghost) { filter: drop-shadow(0 0 8px var(--c)); }
+.hero-b.yi img { filter: drop-shadow(0 0 16px #ffcf7a) drop-shadow(0 6px 14px rgba(0,0,0,.7)); }
+
+/* ───── 兵器：五階顏色與邊框（白、綠、藍、紫金、赤金） ───── */
+.wframe { position: relative; width: 52px; height: 52px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--e, rgba(216,196,138,.3)); border-radius: 4px; background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--c, #333) 28%, transparent), rgba(5,8,14,.9) 72%); box-shadow: inset 0 0 0 2px rgba(5,8,14,.9), 0 0 8px color-mix(in srgb, var(--c, transparent) 45%, transparent); overflow: hidden; }
+.wframe img { height: 88%; transform: rotate(calc(var(--r) + 35deg)); filter: drop-shadow(0 0 4px var(--c)); }
+.wframe.t3, .wframe.t4 { border-image: linear-gradient(135deg, var(--c), var(--e), var(--c)) 1; }
+.wframe.t4 { box-shadow: inset 0 0 0 2px rgba(5,8,14,.9), 0 0 14px var(--c), 0 0 4px var(--e); }
+.wframe.unknown img { filter: brightness(0) drop-shadow(0 0 1px rgba(255,255,255,.4)); opacity: .7; }
+.wslots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 8px; }
+.wslot { display: flex; align-items: center; gap: 10px; padding: 8px; text-align: left; border: 1px solid var(--goldline); background: rgba(5,8,14,.4); min-height: 68px; }
+.wslot small { display: block; font-family: var(--serif); font-size: 11px; color: var(--dim); }
+.wslot b { display: block; font-size: 17px; font-weight: 400; }
+.wslot.empty b { color: #5a6470; }
+.wfx { font-weight: 400; font-family: var(--brush); }
+.qstate { font-size: 12px; color: var(--dim); white-space: nowrap; }
+.tabs button { position: relative; min-height: 44px; }
+.pip { position: absolute; top: 4px; right: 18%; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; font: 700 10px/16px system-ui; font-style: normal; color: #fff; background: var(--cinnabar2); }
+#nav button { position: relative; }
+#nav button.badge b::after { content: ""; position: absolute; top: 4px; right: calc(50% - 22px); width: 8px; height: 8px; border-radius: 50%; background: var(--cinnabar2); box-shadow: 0 0 6px var(--cinnabar2); }
+.wshow { position: relative; height: 210px; display: flex; align-items: center; justify-content: center; }
+.wshow.sm { height: 150px; }
+.wshow::before { content: ""; position: absolute; width: 170px; height: 170px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--c) 45%, transparent), transparent 68%); }
+.wshow.t3::after, .wshow.t4::after { content: ""; position: absolute; width: 180px; height: 180px; border-radius: 50%; border: 1px solid var(--e); box-shadow: 0 0 20px var(--c); animation: swirl 9s linear infinite; border-style: dashed; }
+.wshow img { position: relative; height: 92%; transform: rotate(calc(var(--r) + 20deg)); filter: drop-shadow(0 0 12px var(--c)); z-index: 1; }
+/* 兵器光效：環繞主角的光暈與粒子 */
+.waura { position: absolute; inset: -6% -30%; z-index: -1; pointer-events: none; }
+.wglow { position: absolute; inset: 10% -10%; border-radius: 50%; }
+.wring { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform: scaleY(2.1); }
+.wring i { position: absolute; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c), 0 0 2px #fff; animation: orbit var(--d) linear infinite; }
+@keyframes orbit { from { transform: rotate(var(--a)) translateX(var(--orb, 90px)); } to { transform: rotate(calc(var(--a) + 360deg)) translateX(var(--orb, 90px)); } }
+@keyframes wbob { 50% { transform: translateY(-10px); } }
+.waura.t1 .wglow { background: radial-gradient(ellipse closest-side, color-mix(in srgb, var(--c) 22%, transparent), transparent 65%); }
+.waura.t2 .wglow { background: radial-gradient(ellipse closest-side, color-mix(in srgb, var(--c) 32%, transparent), transparent 65%); animation: auraPulse2 2.6s ease-in-out infinite; }
+.waura.t3 .wglow { background: radial-gradient(ellipse closest-side, color-mix(in srgb, var(--e) 30%, transparent), color-mix(in srgb, var(--c) 20%, transparent) 40%, transparent 68%); animation: auraPulse2 2.2s ease-in-out infinite; }
+.waura.t4 .wglow { inset: -10% -50%; background: radial-gradient(ellipse closest-side, color-mix(in srgb, var(--e) 22%, transparent), color-mix(in srgb, var(--c) 10%, transparent) 50%, transparent); filter: blur(6px); animation: auraPulse2 1.6s ease-in-out infinite; }
+.waura.t4 .wring i { width: 6px; height: 6px; background: #ffd76a; box-shadow: 0 0 10px #ff6a4a, 0 0 3px #fff; }
+@keyframes auraPulse2 { 50% { opacity: .55; transform: scale(1.08); } }
+.heaven { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 70% -10%, rgba(255,90,50,.42), rgba(255,180,80,.12) 40%, transparent 70%); mix-blend-mode: screen; animation: auraPulse2 4s ease-in-out infinite; }
+/* 卷軸開啟時提示改到下方，不壓標題 */
+#modal:not(.hidden) ~ #toasts { top: auto; bottom: 7%; }
+/* 橫式對話：對話框收窄置中，立繪放大站在兩側 */
+@media (orientation: landscape) {
+  #app.story-mode .char { height: 92%; }
+  #app.story-mode .char.hero { left: 1% !important; }
+  #app.story-mode .char.npc { right: 1%; }
+  #dlg { width: min(60%, 760px); }
+}
+/* 佩劍立繪：劍光疊在劍身／劍柄上 */
+.hfig { position: relative; height: 100%; }
+.hfig > img { height: 100%; display: block; }
+.char .hfig > img { filter: drop-shadow(0 8px 16px rgba(0,0,0,.6)); }
+.hero-stage .hfig > img { animation: none; }
+.hero-stage.gear .hfig { animation: breathe 4.2s ease-in-out infinite; transform-origin: 50% 100%; }
+.hero-stage.gear { left: 50%; height: 84%; bottom: 0; }
+.hfig .waura { --orb: 70px; }
+.wov { position: absolute; height: 0; transform-origin: 0 50%; pointer-events: none; }
+.hero-b .wov img, .wov img { position: absolute; left: 50%; top: 0; height: auto; transform-origin: 50% 50%; max-height: none; opacity: 0; transform: translate(-50%, -50%) rotate(calc(var(--r) - 90deg)); filter: drop-shadow(0 0 3px rgba(0,0,0,.5)); }
+.wov img.on { opacity: 1; }
+.blade { position: absolute; height: 5px; margin-top: -2.5px; transform-origin: 0 50%; border-radius: 3px; pointer-events: none; mix-blend-mode: screen; background: linear-gradient(90deg, transparent, var(--c) 12%, #fff 45%, var(--c) 80%, transparent); opacity: .55; filter: blur(1.5px); }
+.hfig.t1 .blade { opacity: .75; box-shadow: 0 0 8px 1px var(--c); }
+.hfig.t2 .blade, .hfig.t3 .blade, .hfig.t4 .blade { opacity: .95; box-shadow: 0 0 12px 3px var(--c); animation: bladeGlow 1.8s ease-in-out infinite; }
+.hfig.t3 .blade { box-shadow: 0 0 12px 3px var(--c), 0 0 22px 6px color-mix(in srgb, var(--e) 55%, transparent); }
+.hfig.t4 .blade { height: 7px; margin-top: -3.5px; box-shadow: 0 0 14px 4px var(--c), 0 0 28px 8px color-mix(in srgb, var(--e) 60%, transparent); }
+.blade::after { content: ""; position: absolute; top: -2px; bottom: -2px; width: 22%; left: -22%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.95), transparent); filter: blur(1px); }
+.hfig.t2 .blade::after, .hfig.t3 .blade::after, .hfig.t4 .blade::after { animation: bladeSweep 2.4s ease-in-out infinite; }
+@keyframes bladeGlow { 50% { opacity: .6; } }
+@keyframes bladeSweep { 0% { left: -22%; } 60%, 100% { left: 100%; } }
+.hilt { position: absolute; width: 26px; height: 26px; margin: -13px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: radial-gradient(circle, #fff 0 8%, var(--c) 30%, transparent 70%); opacity: .55; }
+.hfig.t2 .hilt, .hfig.t3 .hilt, .hfig.t4 .hilt { width: 40px; height: 40px; margin: -20px; opacity: .9; animation: bladeGlow 1.8s ease-in-out infinite; }
+.char .hfig .waura { --orb: 60px; }
+.hfig.t2 .wglow { background: radial-gradient(ellipse closest-side, color-mix(in srgb, var(--c) 26%, transparent), transparent); }
+.hfig.t3 .wglow { background: radial-gradient(ellipse closest-side, color-mix(in srgb, var(--e) 26%, transparent), color-mix(in srgb, var(--c) 22%, transparent) 45%, transparent); }
+.hfig.t4 .wglow { inset: -4% -20%; background: radial-gradient(ellipse closest-side, color-mix(in srgb, var(--e) 34%, transparent), color-mix(in srgb, var(--c) 26%, transparent) 45%, transparent); filter: blur(4px); }
+/* 打坐佩劍 */
+.hero-stage.sit .hfig { animation: breathe 5.5s ease-in-out infinite; transform-origin: 50% 100%; }
+/* 戰鬥背影：前傾持劍待機（整張立繪以腳底為軸前傾，劍斜指前方），普攻由 Battle.attackAnim 做前衝、揮劍、後座 */
+#heroB { height: 46%; bottom: -1%; aspect-ratio: .74; --lean: 11deg; }
+#heroB.blean { --lean: 0deg; height: 44%; aspect-ratio: 700 / 840; }
+#heroB.blean.ready { animation-name: combatIdleFlat; }
+@keyframes combatIdleFlat { 0%, 100% { transform: translateX(-50%); } 50% { transform: translateX(-50%) translateY(-1.2%); } }
+/* 待機呼吸：整體上下浮動（3.6 秒），立繪再以腳底為軸錯相輕擺，模擬衣袖隨氣流飄動；只用位移與旋轉，不縮放、不改透視 */
+#heroB.ready { transform-origin: 50% 100%; animation: combatIdle 3.6s ease-in-out infinite; }
+@keyframes combatIdle {
+  0%, 100% { transform: translateX(-50%) perspective(900px) rotateX(9deg) rotate(var(--lean)); }
+  50% { transform: translateX(-50%) translateY(-1.4%) perspective(900px) rotateX(9deg) rotate(var(--lean)); }
+}
+#heroB.ready .hfig.pose { animation: sleeveSway 3.6s ease-in-out -0.9s infinite; }
+@keyframes sleeveSway { 0%, 100% { transform: translateX(-50%) rotate(-0.6deg); } 50% { transform: translateX(-50%) rotate(0.6deg); } }
+/* 特效強度「低」：只留浮動；「關」：靜止在前傾待機姿勢 */
+[data-fx="low"] #heroB.ready .hfig.pose { animation: none; }
+[data-fx="off"] #heroB.ready, [data-fx="off"] #heroB.ready .hfig.pose { animation: none; }
+[data-fx="off"] #heroB.ready { transform: translateX(-50%) perspective(900px) rotateX(9deg) rotate(var(--lean)); }
+[data-fx="off"] #heroB.blean.ready { transform: translateX(-50%); }
+#heroB .hfig.pose { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); transform-origin: 50% 100%; }
+#heroB .hfig.pose > img { filter: drop-shadow(0 6px 14px rgba(0,0,0,.7)); }
+#heroB .waura { --orb: 80px; }
+#heroB .hfig.blean { --c: #ff6a4a; --e: #ffd76a; }
+#scene.hitstop, #scene.hitstop * { animation-play-state: paused !important; }   /* 暴擊定格 */
+/* 全程試玩修正 */
+#toasts { top: calc(max(10px, env(safe-area-inset-top)) + 54px); }            /* 提示放在頂列下方，不壓主角臉 */
+#app.story-mode #toasts, #app.title-mode #toasts { top: 14%; }
+#app:has(.dao-hero) #toasts { top: 33%; }   /* 道侶頁：提示放到「道侶・合修」橫幅下方，不和標題重疊 */
+.sealBtn { width: 44px; height: 44px; }
+#controls.busy #ctrlContent, #controls.busy #nav { opacity: .4; transition: opacity .3s; }
+/* 卷軸的按鈕列固定在底部，清單再長也看得到 */
+/* 戰鬥結算：獎勵清單自己捲動，「下一關／洞府」固定在清單下方，不蓋住獎勵 */
+#mBody .loot-list { max-height: min(46vh, 380px); overflow-y: auto; overscroll-behavior: contain; }
+@media (max-height: 700px) { #mBody .loot-list { max-height: 32vh; } }   /* 矮螢幕（例如 320×568）：留出按鈕的位置 */
+#mBody > .row:last-child { position: sticky; bottom: -10px; z-index: 2; margin: 10px -6px -10px; padding: 12px 6px 14px; background: linear-gradient(rgba(16,24,35,0), #111a26 30%); }
+/* 新得兵器放入副手：高亮並可一鍵換主手 */
+.wslot.fresh { padding: 6px 6px 6px 8px; gap: 6px; border-color: var(--c); box-shadow: 0 0 0 1px var(--c), 0 0 14px color-mix(in srgb, var(--c) 45%, transparent); animation: freshGlow 1.6s ease-in-out infinite; }
+.wslot-in { display: flex; align-items: center; gap: 8px; text-align: left; flex: 1; min-width: 0; }
+.wslot-in .wframe { width: 44px; height: 44px; }
+.wslot.fresh .seal.sm { min-width: 48px; padding: 4px 8px; font-size: 14px; letter-spacing: 0; }
+.li.fresh { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 14%, transparent), transparent 70%); box-shadow: inset 3px 0 0 var(--c); }
+@keyframes freshGlow { 50% { box-shadow: 0 0 0 1px var(--c), 0 0 4px color-mix(in srgb, var(--c) 20%, transparent); } }
+.subnote { display: block; font-family: var(--serif); font-size: 12px; color: var(--dim); letter-spacing: 0; }
+.char.gift img { animation: giftIn .8s ease-out; }
+@keyframes giftIn { from { filter: brightness(2.2) drop-shadow(0 0 20px #fff); } }
+.mon.warded img { filter: var(--tint,) drop-shadow(0 0 10px rgba(255,60,60,.9)) drop-shadow(0 0 26px rgba(160,0,30,.7)) drop-shadow(0 12px 22px rgba(0,0,0,.7)); }
+.wslot.fresh { padding: 8px; gap: 10px; }
+.fresh-bar { display: flex; align-items: center; gap: 10px; margin: -2px 0 10px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 10%, rgba(5,8,14,.6)); }
+.fresh-bar p { flex: 1; margin: 0; font-size: 13px; line-height: 1.5; color: var(--paper); }
+.fresh-bar b { color: var(--c); font-weight: 400; font-family: var(--brush); font-size: 15px; margin: 0 2px; }
+.fresh-bar .seal.sm { flex: none; font-size: 15px; letter-spacing: 0; padding: 6px 10px; }
+
+/* ───── 測靈石：各圖層用石碑原圖的百分比座標對齊 ───── */
+.stele { position: absolute; left: 50%; bottom: 0; height: 100%; aspect-ratio: 1168 / 784; transform: translateX(-50%); --lit: 0; }
+.stele > img, .st-glow img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+/* 符文發光：反相後刻痕變亮、石身變暗，螢幕混色只加亮刻痕；外框裁成石碑輪廓，再由下往上揭開 */
+.st-glow { position: absolute; inset: 0; mix-blend-mode: screen; opacity: 0; transition: opacity .5s; clip-path: polygon(50% 5%, 59% 17%, 60% 62%, 58% 70%, 42% 70%, 40% 62%, 41% 17%); }
+.st-glow img { filter: invert(1) contrast(3.6) brightness(.85) sepia(1) hue-rotate(150deg) saturate(6); clip-path: inset(calc(72% - var(--lit) * 68%) 0 0 0); transition: clip-path .4s ease-out; }
+.stele.touch .st-glow { opacity: 1; }
+.st-dusk { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 60%, rgba(8,14,26,.35), rgba(4,8,16,.8)); opacity: 0; transition: opacity 1.2s; }
+.stele.rise .st-dusk { opacity: 1; }
+/* 靈光：先把原圖暗底壓成純黑（螢幕混色下才不會出現灰色邊框），底部漸隱接到石台 */
+.st-light { mix-blend-mode: screen; opacity: 0; filter: brightness(.92) contrast(1.7); -webkit-mask-image: linear-gradient(to top, transparent 24%, #000 34%); mask-image: linear-gradient(to top, transparent 24%, #000 34%); transform-origin: 49% 76%; transition: opacity 1.2s; }
+.stele > .st-light { width: 97%; height: 97%; left: 2.5%; top: .3%; }
+.stele.rise .st-light { opacity: .55; }
+.stele.shoot .st-light { opacity: 1; animation: stShoot 1s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes stShoot { from { transform: scaleY(.15); } to { transform: scaleY(1.1); } }
+.st-hand { position: absolute; left: 41.5%; top: 45%; width: 12%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; opacity: 0; background: radial-gradient(circle, rgba(255,255,255,.95), rgba(150,230,255,.6) 30%, transparent 70%); mix-blend-mode: screen; transition: opacity .4s; z-index: 3; }
+.stele.touch .st-hand { position: absolute; left: 41.5%; top: 45%; width: 12%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; opacity: 0; background: radial-gradient(circle, rgba(255,255,255,.95), rgba(150,230,255,.6) 30%, transparent 70%); mix-blend-mode: screen; transition: opacity .4s; z-index: 3; }
+/* 走向石碑：由畫面下方往石碑左前方走，越走越遠（縮小）；上下半身分兩層，下半身擺動當作衣袍 */
+.st-hero { position: absolute; left: 50%; bottom: -45%; height: 56%; aspect-ratio: 437 / 1082; transform: translateX(-50%); transition: left 2.2s ease-out, bottom 2.2s ease-out, height 2.2s ease-out, opacity .35s; z-index: 2; }
+.st-hero.arrive { left: 31%; bottom: 23%; height: 40%; }
+.st-hero img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.sh-top { clip-path: inset(0 0 44% 0); }
+.sh-bot { clip-path: inset(56% 0 0 0); transform-origin: 50% 56%; }
+.st-hero.walking { animation: walkBob .5s ease-in-out infinite; }
+.st-hero.walking .sh-bot { animation: robeSwing .5s ease-in-out infinite alternate; }
+@keyframes walkBob { 0%, 100% { translate: 0 0; rotate: -1deg; } 50% { translate: 0 -1.6%; rotate: 1deg; } }
+@keyframes robeSwing { from { transform: skewX(-4deg); } to { transform: skewX(4deg); } }
+/* 手按石碑：側身圖的掌心（圖內 98.8%, 21%）對準石碑左側面 */
+.stele > .st-press { position: absolute; left: 24.15%; top: 36.6%; width: auto; height: 40%; aspect-ratio: 688 / 1052; opacity: 0; translate: 2% 0; transition: opacity .35s, translate .5s ease-out; z-index: 2; }
+.stele.touch .st-hero { opacity: 0; }
+.stele.touch .st-press { opacity: 1; translate: 0 0; }
+/* 雷、冰專屬光柱：圖內光柱根部（50%, 80%）對準石台中心 */
+.stele > .st-pillar { left: 29.2%; top: 0; width: auto; height: 92.5%; aspect-ratio: 784 / 1168; mix-blend-mode: screen; opacity: 0; filter: brightness(.92) contrast(1.6);
+  -webkit-mask-image: radial-gradient(ellipse 48% 52% at 50% 38%, #000 55%, transparent); mask-image: radial-gradient(ellipse 48% 52% at 50% 38%, #000 55%, transparent); transform-origin: 50% 80%; }   /* 橢圓漸隱，四邊都不露出圖框 */
+.stele.shoot-img .st-pillar { opacity: 1; animation: stShoot 1s cubic-bezier(.2,.8,.2,1) forwards; }
+.stele.shoot-img .st-light { opacity: 0; }
+.root-card { position: absolute; left: 50%; bottom: calc(4% + var(--safe-b)); width: min(92%, 420px); transform: translateX(-50%); z-index: 6; padding: 18px 18px 16px; text-align: center;
+  background: linear-gradient(rgba(10,16,28,.95), rgba(6,10,18,.97)); box-shadow: inset 0 0 0 1px var(--goldline), 0 12px 30px rgba(0,0,0,.6); animation: unroll .5s ease-out; }
+.rc-head { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.rc-head b { font-family: var(--brush); font-size: 36px; letter-spacing: 8px; font-weight: 400; text-shadow: 0 0 18px currentColor; }
+.rc-grade { padding: 4px 10px; font-family: var(--brush); font-size: 22px; color: var(--g); border: 2px solid var(--g); border-radius: 4px; transform: rotate(-4deg); box-shadow: 0 0 12px color-mix(in srgb, var(--g) 50%, transparent); }
+.rc-desc { margin: 10px 0 4px; font-size: 15px; line-height: 1.7; color: var(--paper); }
+.rc-desc em { font-style: normal; color: var(--gold2); }
+.rc-note { margin: 0 0 4px; font-size: 12px; color: var(--dim); }
+/* 窄螢幕換行時兩行等長，避免最後一個字單獨掉到下一行（例如「斬妖得修為與靈／石」「靈根加成倍／率」） */
+.seal small, .rc-note, .rc-desc { text-wrap: balance; }
+.rc-note { word-break: keep-all; }   /* 只在「、」處換行，不把「玄 ×1.2」拆開 */
+/* ───── 突破三段 ───── */
+.bt-faxiang { position: absolute; left: 50%; bottom: 0; height: 100%; transform: translateX(-50%) scale(.6); opacity: 0; mix-blend-mode: screen; transition: opacity 1.2s ease-out, transform 1.8s cubic-bezier(.2,.8,.2,1); }
+.bt-faxiang.on { opacity: .95; transform: translateX(-50%) scale(1.04); }
+.bt-ring { position: absolute; width: min(80%, 420px); aspect-ratio: 1; transform: translate(-50%, -50%) scaleY(.32) scale(0); opacity: 0; mix-blend-mode: screen; pointer-events: none; transition: transform 1.2s cubic-bezier(.2,.8,.2,1), opacity .6s; }
+.bt-ring img { width: 100%; height: 100%; animation: swirl 7s linear infinite; }
+.bt-ring.on { opacity: 1; transform: translate(-50%, -50%) scaleY(.32) scale(1); }
+.bt-ring.burst { opacity: 0; transform: translate(-50%, -50%) scaleY(.32) scale(3.2); transition: transform 1.4s ease-out, opacity 1.4s ease-in; }
+.bt-ring.broken { opacity: 0; filter: grayscale(1) brightness(.5); transform: translate(-50%, -50%) scaleY(.32) scale(.5); }
+#scene.bt-white::before { content: ""; position: absolute; inset: 0; z-index: 4; background: #fff; pointer-events: none; animation: btWhite 1.2s ease-out forwards; }
+@keyframes btWhite { 0% { opacity: 0; } 12% { opacity: .95; } 100% { opacity: 0; } }
+.bt-panel { position: absolute; left: 50%; bottom: 4%; width: min(92%, 380px); transform: translateX(-50%); z-index: 6; padding: 16px 18px 14px; text-align: center;
+  background: linear-gradient(rgba(10,16,28,.94), rgba(6,10,18,.97)); box-shadow: inset 0 0 0 1px var(--goldline), 0 12px 30px rgba(0,0,0,.6); animation: unroll .5s ease-out; }
+.bt-panel h3 { margin: 0 0 8px; font-family: var(--brush); font-size: 28px; font-weight: 400; letter-spacing: 6px; color: var(--gold2); }
+.bt-panel h3.fail { color: #ff9a9a; font-size: 22px; letter-spacing: 2px; }
+.bt-panel p { margin: 0 0 6px; font-size: 14px; line-height: 1.7; color: var(--paper); }
+.bt-stats { display: grid; gap: 4px; margin-bottom: 4px; }
+.bt-stats div { display: grid; grid-template-columns: 4em 1fr auto 1fr; align-items: baseline; gap: 6px; font-size: 14px; }
+.bt-stats span { color: var(--dim); text-align: left; }
+.bt-stats b { font-family: var(--brush); font-weight: 400; font-size: 17px; text-align: right; }
+.bt-stats b.up { color: #b8f0c8; text-align: left; }
+.bt-stats i { font-style: normal; color: var(--gold); }
+/* 直式畫面窄：石碑場景縮到 72% 高，左右才看得到走位與按碑的主角；頂端漸隱接夜空 */
+@media (orientation: portrait) {
+  .stele { height: 72%; transform: translateX(-46%); }
+  .stele { -webkit-mask-image: linear-gradient(to bottom, transparent, #000 30%); mask-image: linear-gradient(to bottom, transparent, #000 30%); }
+  .st-hero.arrive { left: 34%; }
+}
+/* 跳過劇情／演出 */
+#skipBtn { position: absolute; right: 12px; top: calc(max(10px, env(safe-area-inset-top)) + 4px); z-index: 9; min-width: 64px; }
+/* 機緣 */
+.gacha-ring { position: absolute; left: 50%; top: 58%; width: min(72%, 340px); aspect-ratio: 1; transform: translate(-50%, -50%); mix-blend-mode: screen; transition: transform .6s, filter .4s; }
+.gacha-ring img { width: 100%; height: 100%; animation: swirl 24s linear infinite; opacity: .8; }
+.gacha-ring.gather img { animation-duration: 2.5s; opacity: 1; }
+.gacha-ring.lit { transform: translate(-50%, -50%) scale(1.15); }
+.gacha-ring.lit img { filter: grayscale(1) brightness(1.4); }
+.gacha-ring.lit::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--c); mix-blend-mode: multiply; opacity: .9; -webkit-mask: url(assets/fx/ring.webp) center / 100% 100%; mask: url(assets/fx/ring.webp) center / 100% 100%; }   /* 光陣依最高品階換色 */
+.gacha-sky { position: absolute; inset: 0; pointer-events: none; opacity: 0; mix-blend-mode: screen; transition: opacity .5s; z-index: 1; background: radial-gradient(ellipse at 50% 35%, color-mix(in srgb, var(--e, #fff) 60%, transparent), color-mix(in srgb, var(--c, #fff) 45%, transparent) 45%, transparent 85%); }
+.gacha-sky.on { opacity: 1; }
+.pity { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin: 2px 0 8px; font-size: 13px; color: var(--dim); }
+.pity b { font-family: var(--brush); font-size: 30px; font-weight: 400; color: var(--gold2); }
+.gacha-btns { margin: 12px 0 10px; gap: 16px; }
+.gacha-btns .seal { min-width: 120px; }
+.new { display: inline-block; margin-left: 6px; padding: 0 5px; font-style: normal; font-family: var(--serif); font-size: 11px; line-height: 17px; color: #fff; background: var(--cinnabar2); border-radius: 3px; vertical-align: 2px; }
+.gres.t3, .gres.t4 { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 16%, transparent), transparent 70%); }
+/* ───── 雷劫 ───── */
+.bt-dark { position: absolute; inset: 0; background: #05040c; opacity: 0; transition: opacity 1.6s; pointer-events: none; }
+.bt-dark.on { opacity: .55; }
+.bt-cloud { position: absolute; left: -15%; right: -15%; top: 0; height: 62%; opacity: 0; transform: translateY(-55%); transition: transform 1.8s cubic-bezier(.2,.7,.3,1), opacity 1.4s; -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); pointer-events: none; }
+.bt-cloud img { width: 100%; height: 100%; object-fit: cover; mix-blend-mode: screen; animation: swirl 40s linear infinite; transform-origin: 50% 45%; }
+.bt-cloud.on { opacity: 1; transform: translateY(0); }
+.bt-cloud.clear { opacity: 0; transform: translateY(-40%) scale(1.3); transition-duration: 1.2s; }
+.bt-core { position: absolute; left: 50%; top: 42%; width: 40%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, #fff, rgba(214,190,255,.7) 25%, transparent 65%); mix-blend-mode: screen; opacity: 0; }
+.bt-cloud.warn .bt-core { animation: core .5s ease-in; }
+@keyframes core { 0% { opacity: 0; } 30% { opacity: .9; } 45% { opacity: .2; } 70% { opacity: 1; } 100% { opacity: .6; } }
+.bt-warn { position: absolute; width: 150px; height: 46px; transform: translate(-50%, -50%) scale(2.2); border: 3px solid #ff3b3b; border-radius: 50%; box-shadow: 0 0 14px #ff3b3b, inset 0 0 10px rgba(255,60,60,.6); opacity: 0; pointer-events: none; }
+.bt-warn::after { content: ""; position: absolute; inset: 30%; border-radius: 50%; border: 2px solid rgba(255,120,120,.8); }
+.bt-warn.go { animation: warn .5s linear forwards; }
+@keyframes warn { from { opacity: .4; transform: translate(-50%, -50%) scale(2.4); } 60% { opacity: 1; } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+/* 天雷：只取原圖中央的雷柱（object-fit 裁切＋橢圓遮罩），不露出雲與山景的方框 */
+.bt-bolt { position: absolute; top: 0; width: calc(130px * var(--w)); object-fit: cover; object-position: 50% 35%; transform: translateX(-50%); transform-origin: 50% 0; mix-blend-mode: screen; filter: brightness(var(--b)) contrast(1.5); pointer-events: none; animation: bolt .5s ease-out forwards;
+  -webkit-mask-image: radial-gradient(ellipse 42% 60% at 50% 45%, #000 45%, transparent); mask-image: radial-gradient(ellipse 42% 60% at 50% 45%, #000 45%, transparent); }
+@keyframes bolt { 0% { clip-path: inset(0 0 100% 0); opacity: 1; } 18% { clip-path: inset(0 0 0 0); opacity: 1; } 100% { clip-path: inset(0 0 0 0); opacity: 0; } }
+.bt-impact { position: absolute; width: 100%; transform: translate(-50%, -50%) scale(var(--s)); mix-blend-mode: screen; pointer-events: none; animation: impact .6s ease-out forwards;
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 55%, #000 50%, transparent); mask-image: radial-gradient(ellipse 50% 50% at 50% 55%, #000 50%, transparent); }
+@keyframes impact { 0% { opacity: 0; transform: translate(-50%, -50%) scale(calc(var(--s) * .6)); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(var(--s)); } }
+#scene.bt-hit::before { content: ""; position: absolute; inset: 0; z-index: 4; background: #fff; pointer-events: none; animation: btHit .35s ease-out forwards; }
+@keyframes btHit { 0% { opacity: 0; } 10% { opacity: .55; } 100% { opacity: 0; } }
+.bt-bolt, .bt-impact { z-index: 5; }   /* 天雷疊在白閃之上 */
+.bt-shield { position: absolute; transform: translate(-50%, -50%) scale(.6); opacity: 0; border-radius: 50%; border: 2px solid rgba(143,240,216,.75); background: radial-gradient(ellipse, rgba(143,240,216,.06) 40%, rgba(143,240,216,.25)); box-shadow: 0 0 22px rgba(143,240,216,.5), inset 0 0 18px rgba(143,240,216,.35); transition: transform .6s, opacity .6s; pointer-events: none; --crack: 0; }
+.bt-shield.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.bt-shield.hit { animation: shHit .35s; }
+@keyframes shHit { 30% { box-shadow: 0 0 40px #fff, inset 0 0 30px #fff; } }
+.bt-shield svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bt-shield .ck { fill: none; stroke: #e8fffb; stroke-width: 1.1; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 3px #8ff0d8); opacity: 0; }
+.bt-shield .ck1 { opacity: calc((var(--crack) - .1) * 4); } .bt-shield .ck2 { opacity: calc((var(--crack) - .3) * 4); }
+.bt-shield .ck3 { opacity: calc((var(--crack) - .45) * 4); } .bt-shield .ck4 { opacity: calc((var(--crack) - .6) * 4); }
+.bt-shield.fade { opacity: 0; }
+.bt-shield.shatter { opacity: 0; transform: translate(-50%, -50%) scale(1.4); transition-duration: .4s; }
+.hero-stage.down { transition: transform 1s ease-in, filter 1s; transform: translateX(-50%) translateY(6%) rotate(-8deg); filter: grayscale(.8) brightness(.45); }
+.bt-hud { position: absolute; left: 50%; top: calc(max(10px, env(safe-area-inset-top)) + 54px); transform: translateX(-50%); width: min(86%, 360px); z-index: 5; display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 8px; padding: 6px 12px; font-size: 13px; color: var(--paper); background: rgba(5,8,14,.72); border: 1px solid var(--goldline); }
+.bt-hud b { font-family: var(--brush); font-weight: 400; font-size: 17px; color: var(--gold2); }
+.bt-hud .bar { height: 10px; }
+.bt-tap { position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%) rotate(-2deg); z-index: 6; min-width: 150px; min-height: 76px; font-size: 28px; }
+.bt-tap.pressed { transform: translateX(-50%) scale(.94); filter: brightness(1.3); }
+/* ───── 丹爐：待機／煉製／成丹／炸爐 ───── */
+.furnace { position: absolute; left: 50%; bottom: 3%; height: 74%; aspect-ratio: .66; transform: translateX(-50%); }
+.furnace .fz { position: absolute; left: 50%; bottom: 0; height: 100%; transform: translateX(-50%); transition: opacity .35s; filter: drop-shadow(0 12px 18px rgba(0,0,0,.6)); }
+.furnace .fz.idle { height: 97%; animation: fzBreath 3.2s ease-in-out infinite; }
+.furnace .fz.ok, .furnace .fz.fail { opacity: 0; }
+.furnace.done-ok .fz.idle, .furnace.done-fail .fz.idle { opacity: 0; }
+.furnace.done-ok .fz.ok, .furnace.done-fail .fz.fail { opacity: 1; }
+@keyframes fzBreath { 50% { filter: drop-shadow(0 12px 18px rgba(0,0,0,.6)) brightness(1.12) saturate(1.15); } }
+.fz-fire { position: absolute; left: 50%; bottom: 0; width: 90%; height: 22%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, rgba(255,110,50,.75), rgba(255,60,30,.3) 45%, transparent 70%); mix-blend-mode: screen; animation: fzFire 1.6s ease-in-out infinite alternate; pointer-events: none; }
+@keyframes fzFire { to { opacity: .55; transform: translateX(-50%) scale(.92); } }
+.furnace.brewing .fz-fire { animation-duration: .18s; transform: translateX(-50%) scale(1.5); background: radial-gradient(ellipse, rgba(255,200,90,.95), rgba(255,90,30,.6) 45%, transparent 72%); }
+.furnace.brewing .fz.idle { animation: fzShake .12s linear infinite; }
+@keyframes fzShake { 25% { transform: translateX(calc(-50% - 3px)) rotate(-.6deg); } 75% { transform: translateX(calc(-50% + 3px)) rotate(.6deg); } }
+.fz-pill { position: absolute; left: 50%; top: 30%; width: 34px; height: 34px; margin-left: -17px; border-radius: 50%; opacity: 0; pointer-events: none; background: radial-gradient(circle at 35% 30%, #fff, var(--c, #ffe7a0) 55%, rgba(0,0,0,.4)); box-shadow: 0 0 20px var(--c, #ffe7a0), 0 0 50px #ffe7a0; }
+.furnace.done-ok .fz-pill { display: none; }   /* 舊的圓球丹藥：改由 .pill-show 顯示實際丹藥圖 */
+@keyframes pillRise { 0% { opacity: 0; transform: translateY(40px) scale(.4); } 25% { opacity: 1; } 100% { opacity: 1; transform: translateY(-70px) scale(1.15); } }
+/* ───── 持逆天劍：赤金光輪、雷光、粒子；換圖時閃光 ───── */
+.hfig.nitian { --c: #ff6a4a; --e: #ffd76a; isolation: isolate; }
+.nt-halo { position: absolute; left: 50%; top: 13%; width: 62%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; z-index: -1;
+  background: radial-gradient(circle, transparent 54%, rgba(255,215,106,.85) 57%, rgba(255,90,60,.9) 61%, transparent 66%), repeating-conic-gradient(rgba(255,215,106,.5) 0 2deg, transparent 2deg 15deg);
+  -webkit-mask-image: radial-gradient(circle, transparent 40%, #000 52%, #000 70%, transparent 72%); mask-image: radial-gradient(circle, transparent 40%, #000 52%, #000 70%, transparent 72%);
+  filter: drop-shadow(0 0 12px #ff6a4a); animation: swirl 12s linear infinite; }
+.nt-bolt { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 30% 40% at 25% 70%, rgba(200,170,255,.55), transparent 70%); mix-blend-mode: screen; opacity: 0; animation: ntBolt 2.6s steps(1) infinite; }
+@keyframes ntBolt { 0%, 60%, 66%, 100% { opacity: 0; } 62% { opacity: 1; } 64% { opacity: .3; } 65% { opacity: 1; } }
+.hfig.nitian > img { animation: ntGlow 2.6s ease-in-out infinite; }
+@keyframes ntGlow { 50% { filter: drop-shadow(0 0 10px rgba(255,90,60,.6)); } 62% { filter: drop-shadow(0 0 18px rgba(220,190,255,.9)) brightness(1.12); } }
+.hero-stage.swap::after { content: ""; position: absolute; left: -40%; right: -40%; top: 0; bottom: 0; background: radial-gradient(ellipse at 50% 40%, rgba(255,255,255,.95), rgba(255,215,106,.4) 35%, transparent 65%); pointer-events: none; animation: swapFlash .6s ease-out forwards; }
+@keyframes swapFlash { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
+/* 炸爐黑煙（FX 粒子是加亮混色，畫不出黑色，改用 CSS） */
+.fz-smoke { position: absolute; left: 50%; top: 18%; width: 70%; aspect-ratio: 1; margin-left: -35%; border-radius: 50%; opacity: 0; pointer-events: none; background: radial-gradient(circle, rgba(18,15,16,.85), rgba(30,26,28,.5) 40%, transparent 70%); filter: blur(6px); }
+.furnace.done-fail .fz-smoke { animation: smoke 1.7s ease-out forwards; }
+.furnace.done-fail .fz-smoke.s2 { animation-delay: .25s; left: 38%; }
+@keyframes smoke { 0% { opacity: 0; transform: translateY(20%) scale(.5); } 25% { opacity: 1; } 100% { opacity: 0; transform: translateY(-80%) scale(1.6); } }
+.hfig.nitian .wring { transform: scaleY(1.3); }
+.hfig.nitian .waura { --orb: 120px; }
+.hfig.nitian .wring i { width: 4px; height: 4px; margin: -2px; }
+/* ───── 丹爐仙氣：一律以丹爐中心為錨點、左右對稱 ─────
+   外層座標：寬 = 丹爐 2.5 倍、高 = 丹爐 1.4 倍；丹爐中心 x = 50%，爐口 y ≈ 45.7%，爐底 y ≈ 94.3% */
+.furnace { --spd: 1; }
+.furnace.brewing { --spd: .35; }
+.fz-back, .fz-plume, .fz-front { position: absolute; left: -75%; right: -75%; top: -32%; bottom: -8%; pointer-events: none; }
+.fz-front { width: 250%; height: 140%; z-index: 3; }
+/* 爐後仙霧：每份寬約一個丹爐，左右各一（右側鏡像）合計約 2.1 倍爐寬；緩慢上飄、淡入淡出，兩組錯開 */
+.xw { position: absolute; bottom: 22%; height: 66%; mix-blend-mode: screen; opacity: 0; transition: filter 1s;
+  -webkit-mask-image: radial-gradient(ellipse 46% 50% at 50% 50%, #000 40%, transparent); mask-image: radial-gradient(ellipse 46% 50% at 50% 50%, #000 40%, transparent); }
+.xw.l { left: 28%; } .xw.r { left: 72%; }
+.xw.l { animation: xwRiseL calc(14s * var(--spd)) linear infinite; }
+.xw.r { animation: xwRiseR calc(14s * var(--spd)) linear infinite; }
+.xw.b { animation-delay: calc(-7s * var(--spd)); }
+@keyframes xwRiseL { 0% { transform: translate(-50%, 14%) scale(.92); opacity: 0; } 30% { opacity: .34; } 70% { opacity: .26; } 100% { transform: translate(-50%, -16%) scale(1.06); opacity: 0; } }
+@keyframes xwRiseR { 0% { transform: translate(-50%, 14%) scaleX(-1) scale(.92); opacity: 0; } 30% { opacity: .34; } 70% { opacity: .26; } 100% { transform: translate(-50%, -16%) scaleX(-1) scale(1.06); opacity: 0; } }
+/* 爐後淡光：把丹爐托出背景 */
+.fz-back::before { content: ""; position: absolute; left: 50%; top: 52%; width: 44%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(150,250,230,.22), rgba(90,200,220,.08) 45%, transparent 70%); mix-blend-mode: screen; animation: mouth 4.2s ease-in-out infinite; }
+/* 爐底淡青金光環與地霧：讓爐身融入地面 */
+.fz-ring { position: absolute; left: 50%; top: 93%; width: 54%; height: 9%; transform: translate(-50%, -50%); border-radius: 50%; mix-blend-mode: screen;
+  background: radial-gradient(ellipse, transparent 52%, rgba(240,220,150,.7) 62%, rgba(150,240,225,.5) 70%, transparent 78%); filter: blur(1.5px); animation: ringBreath 4.6s ease-in-out infinite; }
+@keyframes ringBreath { 50% { opacity: .6; transform: translate(-50%, -50%) scale(1.05); } }
+.fz-ground { position: absolute; left: 50%; top: 94%; width: 36%; height: 10%; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(ellipse, rgba(190,245,235,.34), rgba(140,220,210,.12) 50%, transparent 72%); filter: blur(4px); animation: ground calc(7s * var(--spd)) ease-out infinite; }
+.fz-ground.g2 { animation-delay: calc(-3.5s * var(--spd)); }
+@keyframes ground { 0% { transform: translate(-50%, -50%) scale(.6); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(-50%, -50%) scale(2.4, 1.5); opacity: 0; } }
+/* 前景薄霧蓋住爐腳：爐身與地面融合，不像貼上去 */
+.fz-floor { position: absolute; left: -35%; right: -35%; bottom: -3%; height: 16%; z-index: 2; pointer-events: none; border-radius: 50%; background: radial-gradient(ellipse at 50% 70%, rgba(170,225,220,.30), rgba(120,190,200,.12) 45%, transparent 70%); filter: blur(5px); }
+/* 爐口青煙：往上擴散成傘狀，頂部融入後方仙霧 */
+.fz-plume { z-index: 2; }
+.pl { position: absolute; left: 50%; bottom: 54%; height: 46%; mix-blend-mode: screen; transform-origin: 50% 100%; opacity: 0; filter: brightness(1.45) saturate(1.15);
+  -webkit-mask-image: radial-gradient(ellipse 50% 60% at 50% 60%, #000 35%, transparent); mask-image: radial-gradient(ellipse 50% 60% at 50% 60%, #000 35%, transparent);
+  animation: plume calc(6s * var(--spd)) ease-out infinite; }
+.pl.b { animation-delay: calc(-3s * var(--spd)); transform: scaleX(-1); animation-name: plumeB; }
+@keyframes plume { 0% { transform: translate(-50%, 6%) scale(.32, .3); opacity: 0; } 18% { opacity: .75; } 60% { opacity: .5; } 100% { transform: translate(-50%, -14%) scale(1.5, 1.05); opacity: 0; } }
+@keyframes plumeB { 0% { transform: translate(-50%, 6%) scale(-.32, .3); opacity: 0; } 18% { opacity: .7; } 60% { opacity: .45; } 100% { transform: translate(-50%, -14%) scale(-1.5, 1.05); opacity: 0; } }
+/* 爐口光暈呼吸 */
+.fz-mouth { position: absolute; left: 50%; top: 32%; width: 58%; height: 13%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, rgba(200,255,240,.6), rgba(120,240,210,.22) 40%, transparent 70%); mix-blend-mode: screen; z-index: 2; animation: mouth 3.4s ease-in-out infinite; pointer-events: none; }
+@keyframes mouth { 50% { opacity: .45; transform: translateX(-50%) scale(.85); } }
+/* 煉丹中：霧氣加速轉金，爐口煙收細變旺 */
+.furnace.brewing .xw, .furnace.brewing .pl { filter: sepia(1) hue-rotate(5deg) saturate(2.4) brightness(1.2); }
+.furnace.brewing .fz-mouth { background: radial-gradient(ellipse, rgba(255,240,190,.9), rgba(255,190,80,.45) 40%, transparent 70%); animation-duration: .6s; }
+.furnace.brewing .fz-ground, .furnace.brewing .fz-floor { background: radial-gradient(ellipse, rgba(255,220,140,.4), rgba(255,180,80,.14) 50%, transparent 72%); }
+.furnace.brewing .fz-ring { background: radial-gradient(ellipse, transparent 52%, rgba(255,214,130,.7) 62%, rgba(255,170,70,.4) 70%, transparent 78%); animation-duration: 1s; }
+/* 成丹：光環爆發、仙霧外擴 */
+.fz-burst { position: absolute; left: 50%; top: 40%; width: 60%; aspect-ratio: 1; transform: translate(-50%, -50%) scale(.2); border-radius: 50%; border: 3px solid rgba(255,231,160,.95); box-shadow: 0 0 24px #ffe7a0, inset 0 0 24px rgba(255,231,160,.6); opacity: 0; z-index: 3; pointer-events: none; }
+.furnace.done-ok .fz-burst { animation: fzBurst 1.1s ease-out forwards; }
+@keyframes fzBurst { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.2); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(3.4); } }
+.furnace.done-ok .fz-back { animation: mistOut 1.6s ease-out forwards; transform-origin: 50% 60%; }
+@keyframes mistOut { to { transform: scale(1.5); } }
+.furnace.done-ok .xw, .furnace.done-ok .pl { animation-play-state: paused; opacity: 0 !important; transition: opacity 1.4s ease-in; }
+.furnace.done-ok::after { content: ""; position: absolute; left: -40%; right: -40%; top: -20%; height: 90%; background: radial-gradient(ellipse at 50% 45%, rgba(255,231,160,.45), transparent 65%); mix-blend-mode: screen; animation: fadeIn .4s; pointer-events: none; }
+/* 炸爐：仙霧轉灰黑煙（改一般混色，暗色才看得見） */
+.furnace.done-fail .xw { mix-blend-mode: normal; filter: grayscale(1) brightness(.16) contrast(1.6); transition: filter .5s; }
+.furnace.done-fail .pl { animation-play-state: paused; opacity: 0 !important; }
+/* 炸爐黑煙：用仙霧圖的亮度當遮罩，填灰黑色，只留下煙縷本身（不會有黑色方框） */
+.smk { position: absolute; left: 50%; bottom: 54%; height: 46%; aspect-ratio: 784 / 1168; transform-origin: 50% 100%; opacity: 0; pointer-events: none; background: #1d1a1c;
+  -webkit-mask: url(assets/fx/xianwu.webp) center / 100% 100% no-repeat; mask: url(assets/fx/xianwu.webp) center / 100% 100% no-repeat luminance; -webkit-mask-source-type: luminance; }
+.furnace.done-fail .smk { animation: failSmoke 1.8s ease-out forwards; }
+.furnace.done-fail .smk.b { animation: failSmokeB 1.8s .15s ease-out forwards; }
+@keyframes failSmoke { 0% { transform: translate(-50%, 8%) scale(.6, .4); opacity: 0; } 15% { opacity: .95; } 70% { opacity: .8; } 100% { transform: translate(-50%, -10%) scale(2.6, 1.5); opacity: 0; } }
+@keyframes failSmokeB { 0% { transform: translate(-50%, 8%) scale(-.6, .4); opacity: 0; } 15% { opacity: .9; } 70% { opacity: .75; } 100% { transform: translate(-50%, -10%) scale(-2.6, 1.5); opacity: 0; } }
+.furnace.done-fail .fz-back { animation: smokeUp 1.8s ease-out forwards; }
+@keyframes smokeUp { to { transform: translateY(-6%) scale(1.1); } }
+.furnace.done-fail .fz-mouth, .furnace.done-fail .fz-ground, .furnace.done-fail .fz-ring, .furnace.done-fail .fz-back::before { opacity: 0; transition: opacity .4s; }
+@media (prefers-reduced-motion: reduce) { .xw, .pl, .fz-ground { animation-duration: 120s !important; } }
+/* ───── 首次載入進度條 ───── */
+#loader { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: radial-gradient(ellipse at 50% 45%, #13202c, #05080d 70%); transition: opacity .5s; }
+#loader.done { opacity: 0; pointer-events: none; }
+#loader b { font-family: var(--brush); font-size: 40px; font-weight: 400; letter-spacing: .3em; color: var(--gold2); text-shadow: 0 0 20px rgba(216,196,138,.5); }
+.ld-bar { width: min(70%, 280px); height: 6px; border: 1px solid var(--goldline); background: rgba(0,0,0,.4); }
+.ld-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #5d4a1c, #f2dc94); box-shadow: 0 0 10px rgba(242,220,148,.6); transition: width .2s; }
+#loader span { font-size: 13px; color: var(--dim); }
+/* 存檔備份 */
+.save-txt { width: 100%; height: 110px; margin: 10px 0 4px; padding: 8px; font: 11px/1.4 ui-monospace, monospace; color: var(--paper); background: rgba(0,0,0,.35); border: 1px solid var(--goldline); resize: none; -webkit-user-select: text; user-select: text; }
+.save-file { width: 100%; margin-top: 10px; font-size: 13px; color: var(--paper); }
+.t-imp { position: absolute; right: 14px; bottom: calc(14px + var(--safe-b)); padding: 10px 14px; min-height: 44px; font-family: var(--serif); font-size: 13px; color: var(--gold2); border: 1px solid var(--goldline); background: rgba(5,8,14,.55); opacity: 0; animation: fadeIn 1.4s 2.6s forwards; }   /* 換手機時不用先開新遊戲就能匯入 */
+
+/* ───── 主角光環畫布（js/halo.js） ───── */
+.halo-cv { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* ───── 靈石圖示：全遊戲共用，高度＝1.2 倍字高 ───── */
+.stone-ico { height: 1.2em; width: auto; aspect-ratio: 84 / 120; object-fit: contain; vertical-align: -.22em; filter: drop-shadow(0 0 3px rgba(90,210,255,.5)); }
+.stone-amt { display: inline-flex; align-items: center; gap: .18em; white-space: nowrap; }
+.stone-amt .stone-ico { vertical-align: 0; }
+.stone-amt b { font-weight: inherit; }
+.ico.img { background: none; box-shadow: none; }
+.ico.img .stone-ico { height: 100%; }
+.stone-fb { display: inline-flex; width: 1.2em; height: 1.2em; align-items: center; justify-content: center; border-radius: 50%; font-style: normal; font-size: .7em; color: #0b121c; background: #9fe8d8; vertical-align: -.22em; }
+
+/* ───── 兵器展示框：玉框蓮台底座（assets/ui/case_frame.webp），框內空洞 左右 26%～74%、上下 14%～74% ───── */
+.wcase { position: relative; height: clamp(170px, calc(100vh - 430px), 330px); height: clamp(170px, calc(100dvh - 430px), 330px); aspect-ratio: 580 / 1142; margin: 0 auto 4px; flex: none; }   /* 依可用高度縮放，整張卡（框、名稱、屬性、按鈕）都要放得進彈窗 */
+.wc-frame { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; filter: drop-shadow(0 6px 14px rgba(0,0,0,.6)); }
+.wc-in { position: absolute; left: 26%; right: 26%; top: 14%; bottom: 26%; z-index: 1; overflow: hidden; display: flex; align-items: center; justify-content: center; perspective: 600px;
+  background: radial-gradient(ellipse at 50% 50%, rgba(10,30,28,.9), rgba(3,8,10,.96)); }
+.wc-glow { position: absolute; inset: 0; background: radial-gradient(ellipse 60% 55% at 50% 50%, color-mix(in srgb, var(--c) 40%, transparent), transparent 75%); animation: auraPulse2 3.2s ease-in-out infinite; }
+/* 框內展示：法寶（鐘鏡塔，直向或橫向）塞滿框內並保持比例；劍先在正方形內等比縮放再轉成直立，斜放的劍轉完也不會超出 */
+.wc-spin { position: absolute; inset: 7% 6%; display: flex; align-items: center; justify-content: center; transform-style: preserve-3d; animation: wcSpin 10s ease-in-out infinite; }
+.wc-spin img { width: 100%; height: 100%; object-fit: contain; display: block; filter: drop-shadow(0 0 8px var(--c)); }
+.wcase:not(.fb) .wc-spin { inset: auto; left: 50%; top: 50%; width: 150%; aspect-ratio: 1; height: auto; margin: 0; translate: -50% -50%; }
+.wcase:not(.fb) .wc-spin img { transform: rotate(var(--r)); }
+@keyframes wcSpin { 0%, 100% { transform: perspective(600px) translateY(2%) rotateY(-18deg); } 50% { transform: perspective(600px) translateY(-2%) rotateY(18deg); } }   /* 緩慢左右擺動＋上下浮動；不再整圈轉（轉到側面會變成一條細線） */
+.wc-cv { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
+.wc-halo { position: absolute; left: -12%; right: -12%; top: 0; bottom: 18%; z-index: 0; pointer-events: none; opacity: .5; background: radial-gradient(ellipse 50% 50% at 50% 46%, color-mix(in srgb, var(--c) 30%, transparent), transparent 70%); }
+/* 神器：外圈光暈、劍身強光；電光粒子由 Showcase 畫 */
+.wcase.t4 .wc-halo { opacity: 1; left: -30%; right: -30%; top: -6%; background: radial-gradient(ellipse 50% 50% at 50% 46%, rgba(255,106,74,.45), rgba(255,215,106,.18) 45%, transparent 70%), repeating-conic-gradient(from 0deg at 50% 46%, rgba(255,215,106,.22) 0 3deg, transparent 3deg 14deg);
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 46%, #000 35%, transparent 72%); mask-image: radial-gradient(ellipse 50% 50% at 50% 46%, #000 35%, transparent 72%); animation: auraPulse2 1.8s ease-in-out infinite; }
+.wcase.t4 .wc-spin img { filter: drop-shadow(0 0 10px var(--c)) drop-shadow(0 0 22px var(--e)); }
+/* 底座圖載入失敗：改用 CSS 框線 */
+.wcase.img-fail .wc-in, .wcase:has(.wc-frame.img-fail) .wc-in { border: 2px solid var(--e); }
+.wc-plate { display: flex; align-items: baseline; justify-content: center; gap: 10px; margin: 0 auto 6px; }
+.wc-plate b { font-family: var(--brush); font-size: 24px; letter-spacing: 3px; color: var(--c); text-shadow: 0 0 10px color-mix(in srgb, var(--c) 60%, transparent), 0 2px 3px #000; font-weight: 400; }
+.wc-plate i { font-style: normal; font-size: 12px; padding: 1px 8px; border: 1px solid var(--e); color: var(--e); letter-spacing: 2px; }
+.wc-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: min(100%, 300px); margin: 0 auto 6px; }
+.wc-stats span { display: flex; flex-direction: column; align-items: center; padding: 5px 0; border: 1px solid var(--goldline); background: rgba(5,8,14,.5); }
+.wc-stats small { font-size: 11px; color: var(--dim); letter-spacing: 2px; }
+.wc-stats b { font-family: var(--brush); font-size: 20px; color: var(--c); font-weight: 400; }
+.wc-fx { margin: 2px auto 8px; width: min(100%, 300px); font-size: 13px; color: var(--paper); text-align: center; line-height: 1.6; }
+.wc-fx b { color: var(--c); margin-right: 6px; font-family: var(--brush); font-size: 15px; font-weight: 400; }
+
+/* ───── 抽取演出：法寶室／功法閣 ───── */
+.gs-hall { position: absolute; inset: 0; overflow: hidden; background: radial-gradient(ellipse at 50% 60%, #14243a, #04070c 75%); }
+.gs-hall.art { background: radial-gradient(ellipse at 50% 60%, #2a2010, #070502 75%); }
+.gs-bg { position: absolute; inset: 0; background-size: cover; background-position: 50% 60%; transform-origin: 50% 62%; animation: gsPush 14s ease-out forwards; }   /* 背景緩慢推近 */
+@keyframes gsPush { from { transform: scale(1); } to { transform: scale(1.14); } }
+.gs-dark { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0) 30%, rgba(2,4,8,.75) 85%); }
+.gs-title { position: absolute; top: 7%; left: 0; right: 0; text-align: center; font-family: var(--brush); font-size: clamp(26px, 7vw, 40px); letter-spacing: .5em; color: var(--gold2); text-shadow: 0 0 18px rgba(216,196,138,.7), 0 2px 4px #000; opacity: 0; animation: fadeIn 1s .2s forwards; }
+#gsFly { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.gs-mote { position: absolute; left: 0; top: 0; width: 90px; height: 90px; margin: -45px 0 0 -45px; pointer-events: none; }
+.gs-orb { position: absolute; left: 50%; top: 48%; width: 120px; height: 120px; margin: -60px; z-index: 3; pointer-events: none; opacity: 0; --k: 0; --c: #e8f4ff; }
+/* 光團圖由 Knock 在載入時去黑（Canvas），不靠 mix-blend-mode；圖載入失敗才用同色系漸層（全程同色相，不經過黑色） */
+.gs-orb.img-fail { border-radius: 50%; background: radial-gradient(circle, #fff 0 10%, color-mix(in srgb, var(--c) 75%, transparent) 28%, color-mix(in srgb, var(--c) 25%, transparent) 48%, color-mix(in srgb, var(--c) 0.5%, transparent) 64%); }
+.gs-orb img:not([src]) { visibility: hidden; }
+.gs-orb img { width: 100%; height: 100%; animation: swirl 3s linear infinite; }
+.gs-orb.on { opacity: 1; transform: scale(calc(.3 + var(--k) * 1.5)); filter: drop-shadow(0 0 calc(4px + var(--k) * 18px) var(--c)); }
+.gs-orb.on img { animation-duration: calc(3s - var(--k) * 2.4s); }
+.gs-orb.pop { animation: gsPop .6s ease-out forwards; }
+@keyframes gsPop { from { opacity: 1; transform: scale(1.8); } to { opacity: 0; transform: scale(5); } }
+.gs-reveal { position: absolute; left: 0; right: 0; top: 48%; transform: translateY(-50%); display: flex; justify-content: center; z-index: 4; pointer-events: none; }
+.gs-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 30px; }
+.gs-card b, .gs-card i, .gs-qty { animation: gsCard .45s .2s cubic-bezier(.2,.9,.3,1.25) both; }
+/* 抽中素材：光團爆開後淡入 */
+.gs-loot { position: relative; height: 150px; display: flex; align-items: center; justify-content: center; animation: lootIn .8s ease-out both; }
+.gs-loot::before { content: ""; position: absolute; inset: -20% -50%; z-index: -1; background: radial-gradient(ellipse closest-side, color-mix(in srgb, var(--c) 45%, transparent), color-mix(in srgb, var(--c) 0.5%, transparent)); }
+.gs-loot .loot { height: 150px; width: auto; max-width: 78vw; object-fit: contain; filter: drop-shadow(0 0 12px var(--c)); }
+@keyframes lootIn { from { opacity: 0; transform: scale(.35); filter: brightness(3); } 60% { opacity: 1; } to { opacity: 1; transform: none; filter: none; } }
+.loot-w { display: inline-flex; height: 100%; align-items: center; }
+.loot-w .loot { transform: rotate(var(--r)); }
+.gs-qty { font-family: var(--brush); font-size: 18px; color: var(--paper); text-shadow: 0 1px 2px #000, 0 0 8px #000, 0 0 14px #000; }
+.loot-sm { display: inline-flex; width: 38px; height: 38px; flex: none; align-items: center; justify-content: center; border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); background: radial-gradient(circle, color-mix(in srgb, var(--c) 25%, transparent), rgba(5,8,14,.9) 70%); }
+.loot-sm .loot { height: 34px; }
+/* 找不到該品階素材：用凡階圖加品階濾鏡 */
+.loot.loot-fb.t1 { filter: hue-rotate(-20deg) saturate(1.3) drop-shadow(0 0 10px var(--c)); }
+.loot.loot-fb.t2 { filter: hue-rotate(40deg) saturate(1.4) drop-shadow(0 0 12px var(--c)); }
+.loot.loot-fb.t3 { filter: hue-rotate(110deg) saturate(1.5) drop-shadow(0 0 14px var(--c)) drop-shadow(0 0 4px var(--e)); }
+.loot.loot-fb.t4 { filter: hue-rotate(-150deg) saturate(2) brightness(1.1) drop-shadow(0 0 16px var(--c)) drop-shadow(0 0 6px var(--e)); }
+.loot-sm .loot.loot-fb { filter: none; }
+.loot-sm .loot.loot-fb.t3 { filter: hue-rotate(110deg) saturate(1.5); } .loot-sm .loot.loot-fb.t4 { filter: hue-rotate(-150deg) saturate(2); } .loot-sm .loot.loot-fb.t2 { filter: hue-rotate(40deg) saturate(1.4); }
+.gs-card b { font-family: var(--brush); font-size: 26px; letter-spacing: 3px; color: var(--c); text-shadow: 0 0 12px var(--c), 0 2px 3px #000; font-weight: 400; }
+.gs-card i { font-style: normal; font-size: 14px; letter-spacing: 2px; color: var(--e); text-shadow: 0 1px 2px #000, 0 0 8px #000, 0 0 14px #000; }
+.gs-card.t4 b { font-size: 32px; }
+@keyframes gsCard { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+.gs-count { position: absolute; left: 0; right: 0; bottom: 5%; text-align: center; font-size: 13px; letter-spacing: 2px; color: var(--paper); text-shadow: 0 1px 3px #000; }
+.li.tap { cursor: pointer; }
+#app.gacha-show #controls, #app.gacha-show #hud { display: none; }
+
+/* ───── 法寶（鐘鏡塔）───── */
+.wframe.fb img { height: 84%; transform: none; filter: drop-shadow(0 0 4px var(--c)); }
+.wslots.one { grid-template-columns: 1fr; }
+.wc-stats.one { grid-template-columns: 1fr; width: min(100%, 160px); }
+.loot.loot-glow { filter: drop-shadow(0 0 10px var(--c)) drop-shadow(0 0 3px var(--e)); }
+.loot-sm .loot.loot-glow { filter: drop-shadow(0 0 3px var(--c)); }
+
+/* 機緣頁：保底進度條、本池神品 */
+.pity-bar { height: 4px; margin: -2px auto 10px; width: min(70%, 320px); background: rgba(255,255,255,.08); }
+.pity-bar i { display: block; height: 100%; width: var(--p); background: linear-gradient(90deg, #c08cff, #ffd36a); box-shadow: 0 0 8px rgba(255,211,106,.6); }
+.gpeek { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 10px 0 2px; flex-wrap: wrap; }
+.gpeek small { color: var(--dim); font-size: 12px; letter-spacing: 2px; margin-right: 2px; }
+.gpeek .wframe { width: 40px; height: 40px; }
+
+/* 靜音鈕、音量滑桿 */
+#hudRes .sealBtn.mute { font-size: 16px; color: var(--gold2); border-color: var(--goldline); }
+#hudRes .sealBtn.mute.off { color: #7a8692; border-color: #3a4450; }
+/* 行囊按鈕：樣式同「聲」「閣」；有圖時蓋住「囊」字，圖載入失敗（被移除）就露出文字 */
+#hudRes span, #hudRes .sealBtn { white-space: nowrap; flex: none; }   /* 多一顆按鈕後靈石數字不能被擠到換行 */
+#hudRes .sealBtn.bag { position: relative; padding: 0; }
+#hudRes .sealBtn.bag img { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); object-fit: contain; }
+#hudRes .sealBtn.bag img + b { visibility: hidden; }
+@media (max-width: 359px) { #hudRes { gap: 4px; } #hudRes .sealBtn { width: 37px; height: 37px; font-size: 17px; } #hudRes span { gap: 3px; } }   /* 320 寬：多一顆按鈕，印章略縮 */
+/* 角色頭像：56px 圓形；道侶頁加粉色光暈 */
+.li .ico.pface { width: 56px; height: 56px; font-size: 22px; flex: none; }
+.li .ico.pface .item-ico { width: 100%; height: 100%; border-radius: 50%; filter: none; }
+.dao-hero ~ * .ico.pface, #ctrlContent .ico.pface { box-shadow: 0 0 0 2px #ff9ec4, 0 0 12px rgba(255,158,196,.7); border-radius: 50%; }
+/* 選角：點角色列展開半身立繪（靠右淡入）與介紹 */
+.ch-row { position: relative; overflow: hidden; cursor: pointer; transition: min-height .3s, background .3s; min-height: 72px; }
+.ch-row .ch-intro, .ch-row .ch-front, .ch-row .seal { display: none; }
+.ch-row.open { min-height: 190px; align-items: flex-start; background: rgba(216,196,138,.06); }
+.ch-row.open .ch-intro { display: block; margin-top: 6px; max-width: 58%; color: var(--paper); }
+.ch-row.open .ch-front { display: block; position: absolute; right: 0; bottom: 0; height: 100%; width: auto; pointer-events: none; -webkit-mask-image: linear-gradient(90deg, transparent, #000 35%); mask-image: linear-gradient(90deg, transparent, #000 35%); animation: chIn .4s ease-out both; }
+.ch-row.open .seal { display: inline-flex; position: absolute; left: 14px; bottom: 12px; z-index: 1; }
+@keyframes chIn { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+.vol { width: 100%; accent-color: var(--cinnabar2); margin: 6px 0 0; }
+.vol-n { min-width: 34px; text-align: right; font-family: var(--brush); color: var(--gold2); }
+
+/* 九幽天魔：妖將圖改紫黑色調、更大 */
+.mon.boss.tianmo { height: 64%; top: 4%; --tint: hue-rotate(235deg) saturate(1.3) brightness(.85) contrast(1.15); }   /* 色調只套在怪物圖，不影響護罩 */
+.mon.boss.tianmo::after { content: ""; position: absolute; inset: 10% -10% 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 50% 45% at 50% 60%, rgba(120,40,200,.45), transparent 70%); animation: auraPulse2 2.4s ease-in-out infinite; }
+.region[data-r="trial"] { box-shadow: inset 0 0 0 1px rgba(192,140,255,.6), 0 0 14px rgba(140,60,220,.35); }
+
+/* ───── 圖片一律保持原始比例 ─────
+   Safari 對「flex 容器裡只設高度的圖片」常沿用原圖寬度而壓扁；圖片內容一律 contain、不參與 flex 伸縮 */
+img { object-fit: contain; }
+.keep-ratio { object-fit: contain; flex: none; max-width: none; }
+.hero-stage > img, .hfig > img, .mon img, .char img, .cutin img, .furnace .fz, .wframe img, .loot, .gs-orb img, .gacha-ring img { width: auto; flex: none; object-fit: contain; }
+.gacha-ring img, .gs-orb img { width: 100%; height: 100%; }
+.mon, .hero-stage, .hfig { align-items: center; }
+.mon { justify-content: flex-start; }
+.hero-stage { align-items: flex-end; }
+
+/* ───── 戰鬥特效分層：怪物名稱與血條永遠最上層 ───── */
+#app.fighting .mon-hud { z-index: 8; }
+#app.fighting .battle-top { z-index: 8; }
+.banner.bt { top: calc(max(10px, env(safe-area-inset-top)) + 100px); z-index: 6; }   /* 技能名：畫面上方居中、血條下方 */
+.banner.bt b { font-size: clamp(26px, 7vw, 40px); }
+.banner.bt span { font-size: 12px; padding: 2px 18px; margin-top: 4px; }
+/* 怪物護罩（魔焰護體等減傷相）：包住怪物、緩慢脈動 */
+@keyframes swirlShield { to { rotate: 360deg; } }
+.mon.warded img#monImg { filter: var(--tint,) drop-shadow(0 0 10px rgba(160,60,220,.7)) drop-shadow(0 12px 22px rgba(0,0,0,.7)); }
+/* 連擊數：固定在畫面右側 */
+.combo-n { position: absolute; right: 12px; top: 40%; z-index: 7; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; font-family: var(--brush); color: #ffd36a; text-shadow: 0 0 10px rgba(255,140,40,.8), 0 2px 3px #000; transition: opacity .3s; }
+.combo-n b { font-size: 40px; line-height: 1; font-weight: 700; }
+.combo-n span { font-size: 14px; letter-spacing: 3px; color: #ffe7b0; }
+.combo-n.hidden { opacity: 0; }
+.combo-n.pop b { animation: comboPop .25s ease-out; }
+@keyframes comboPop { from { transform: scale(1.5); } to { transform: none; } }
+
+/* 展示框：主體由 CaseFit 依比例算好尺寸，疊在玉框前面，可略超出窗口到框上 */
+.wcase .wc-in { overflow: visible; background: none; z-index: auto; perspective: none; }   /* 不建立堆疊層，主體才能疊到玉框前面 */
+.wcase .wc-in::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, rgba(10,30,28,.9), rgba(3,8,10,.96)); z-index: -1; }
+.wcase .wc-spin, .wcase:not(.fb) .wc-spin { position: absolute; inset: 0; width: auto; height: auto; aspect-ratio: auto; translate: none; z-index: 4; display: flex; align-items: center; justify-content: center; animation: wcSpin 6s ease-in-out infinite; }
+.wcase .wc-spin img, .wcase:not(.fb) .wc-spin img { width: auto; height: auto; max-width: none; flex: none; object-fit: fill; }
+.wcase .wc-cv { z-index: 5; }
+.wcase.zap .wc-frame { animation: caseZap .25s ease-out; }
+@keyframes caseZap { 30% { filter: brightness(1.8) drop-shadow(0 0 10px #c9b0ff) drop-shadow(0 6px 14px rgba(0,0,0,.6)); } }
+/* 物品圖示：與靈石同風格（無圓球底，圖片本身發光） */
+.ico.img.item { background: none; box-shadow: none; }
+.ico.img.item .item-ico { width: 118%; height: 118%; max-width: none; object-fit: contain; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--c) 70%, transparent)); }
+
+/* ───── 技能按鈕：圖示置中，保留外圈品階色框與名稱 ───── */
+.skill { overflow: visible; }
+.skill .sk-img { position: absolute; inset: 3px; width: calc(100% - 6px); height: calc(100% - 6px); border-radius: 50%; object-fit: contain; z-index: 1; transition: filter .2s; }
+.skill .sk-img + b { display: none; }   /* 有圖就不顯示單字；圖載入失敗會被移除，單字自動回來 */
+.skill .cd { z-index: 2; }
+.skill:not(.ready) .sk-img { filter: grayscale(.85) brightness(.6); }   /* 冷卻或靈力不足：灰階 */
+.skill.locked .sk-img { filter: grayscale(1) brightness(.35); }
+.skill .cdt { font-size: 18px; font-weight: 700; }
+.skill.ready { animation: skBreath 2.4s ease-in-out infinite; }
+@keyframes skBreath { 50% { box-shadow: 0 0 0 3px rgba(8,13,21,.85), 0 0 0 4px var(--c), 0 0 26px 4px var(--c); } }
+.skill.press { animation: skPress .22s ease-out; }
+@keyframes skPress { 40% { transform: scale(.88); } 100% { transform: scale(1); } }
+.skill .sk-flash { position: absolute; inset: -4px; border-radius: 50%; z-index: 4; pointer-events: none; opacity: 0; background: radial-gradient(circle, rgba(255,255,255,.85), color-mix(in srgb, var(--c) 50%, transparent) 50%, transparent 72%); }
+.skill.press .sk-flash { animation: skFlash .3s ease-out; }
+@keyframes skFlash { 0% { opacity: 1; transform: scale(.7); } 100% { opacity: 0; transform: scale(1.35); } }
+/* 妖物護罩（魔焰護體）：同一張護體素材套紅黑濾鏡 */
+
+/* ───── 護體罩：前後兩層包住角色 ─────
+   後層在角色後面（上半較實、下半淡出）；前層在角色前面，只留邊緣光暈與網格，中心 70% 完全透明（菲涅爾：邊亮心透）
+   素材載入時已去黑，再用 screen 疊加；角色本身不改透明度、不套濾鏡 */
+.hshield, .mon-shield { pointer-events: none; }
+.hshield { position: absolute; z-index: 3; }
+.hshield.back { z-index: 0; }
+.hshield img, .mon-shield { display: block; width: 100%; height: 100%; object-fit: contain; mix-blend-mode: screen; }
+.hshield.back img, .mon-shield.back { opacity: .55; -webkit-mask-image: linear-gradient(#000 35%, rgba(0,0,0,.25) 100%); mask-image: linear-gradient(#000 35%, rgba(0,0,0,.25) 100%); }
+.hshield.front img, .mon-shield.front {
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, transparent 70%, rgba(0,0,0,.55) 84%, #000 95%);
+  mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, transparent 70%, rgba(0,0,0,.55) 84%, #000 95%); filter: brightness(1.25); }
+/* 出現：由腳下往上展開 */
+.hshield.on { animation: shUp .55s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes shUp { from { clip-path: inset(100% -10% -10% -10%); } to { clip-path: inset(-10% -10% -10% -10%); } }
+/* 持續：網格緩慢流動（圖在遮罩內輕微平移）＋整體呼吸 */
+.hshield.on img { animation: shFlow 7s ease-in-out infinite alternate, shBreathe 2.6s ease-in-out infinite; }
+@keyframes shFlow { from { translate: -2% 0; scale: 1.02; } to { translate: 2% -1%; scale: 1.04; } }
+@keyframes shBreathe { 50% { filter: brightness(1.55); } }
+.hshield.back.on img { animation: shFlow 7s ease-in-out infinite alternate-reverse; }
+/* 受擊：被擊中方向的邊緣局部閃亮 */
+.sh-hit { position: absolute; width: 46%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; opacity: 0; mix-blend-mode: screen; background: radial-gradient(circle, rgba(255,255,255,.95), rgba(180,250,255,.55) 30%, transparent 68%); }
+.hshield.hit .sh-hit { animation: shHitSpot .36s ease-out; }
+@keyframes shHitSpot { 0% { opacity: 1; scale: .5; } 100% { opacity: 0; scale: 1.3; } }
+/* 消失：淡出並略放大（同時 FX 噴出六角光片） */
+.hshield.off { animation: shOff .4s ease-in forwards; }
+@keyframes shOff { to { opacity: 0; scale: 1.12; } }
+.hshield.img-fail.front { border-radius: 50%; box-shadow: inset 0 0 26px rgba(143,240,216,.7), 0 0 18px rgba(143,240,216,.45); }
+.hshield.img-fail img { display: none; }
+/* 妖物版（魔焰護體）：同結構，只濾護罩；色調變數清空，不吃妖物的天魔色 */
+.mon .mon-shield { --tint: ; position: absolute; left: 50%; top: 50%; height: 112%; width: auto; aspect-ratio: 541 / 600; max-width: none; translate: -50% -50%; transform: none; transform-origin: 50% 50%; opacity: 0; transition: opacity .4s; animation: none; z-index: 2; }
+.mon .mon-shield.back { z-index: 0; }
+.mon #monImg { position: relative; z-index: 1; }
+.mon.warded .mon-shield { opacity: 1; animation: shUp .55s cubic-bezier(.2,.8,.3,1) both, shBreatheM 2.6s ease-in-out infinite; }
+@keyframes shBreatheM { 50% { opacity: .7; } }   /* 妖物版用透明度呼吸，不動 filter，紅黑濾鏡才不會被蓋掉 */
+.mon.warded .mon-shield.back { opacity: .55; animation: shUp .55s cubic-bezier(.2,.8,.3,1) both; }
+.mon.warded .mon-shield { filter: grayscale(1) brightness(.85) sepia(1) hue-rotate(-50deg) saturate(8) contrast(1.35) drop-shadow(0 0 12px rgba(200,20,40,.8)); }
+.mon.dead .mon-shield { display: none; }
+
+/* ───── 共用圖示：列表圖示框、材料小圖示、功法品階框、煉丹印章 ───── */
+.ico.img.item { overflow: visible; }
+.ico.img.item.dim .item-ico { filter: grayscale(.85) brightness(.55); }
+.mat-ico { height: 1.15em; width: auto; aspect-ratio: 1; object-fit: contain; vertical-align: -.24em; margin-right: 3px; filter: drop-shadow(0 0 2px rgba(0,0,0,.6)); }
+/* 功法列：依品階加外框光色；已臻圓滿加金色微光 */
+.li .ico.art { border-radius: 8px; background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--c) 22%, transparent), rgba(5,8,14,.85) 72%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 70%, transparent), 0 0 8px color-mix(in srgb, var(--c) 45%, transparent); }
+.li .ico.art .item-ico { width: 104%; height: 104%; }
+.li .ico.art.t4 { box-shadow: inset 0 0 0 1px #ffd76a, 0 0 12px rgba(255,106,74,.6); }
+.li .ico.art.max { animation: artMax 2.4s ease-in-out infinite; }
+@keyframes artMax { 50% { box-shadow: inset 0 0 0 1px #ffe7a0, 0 0 16px 3px rgba(255,215,106,.75); } }
+.li .ico.art.dim { box-shadow: inset 0 0 0 1px rgba(120,130,140,.4); }
+.seal-img { width: 48px; height: 48px; flex: none; padding: 0; border: none; background: none; cursor: pointer; transition: transform .12s, filter .2s; }
+.seal-img img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,.6)); }
+.seal-img:active:not(:disabled) { transform: scale(.9) rotate(-3deg); }
+.seal-img:disabled { filter: grayscale(.9) brightness(.55); cursor: default; }
+.seal-img.img-fail::after { content: "煉"; color: var(--cinnabar2); font-family: var(--brush); font-size: 20px; }
+
+/* ───── 成丹演出（失敗演出不受影響） ───── */
+.pill-show { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.ps-pillar { position: absolute; left: var(--mx); bottom: calc(100% - var(--my)); width: 46%; translate: -50% 4%; transform-origin: 50% 100%; animation: psPillar var(--stay) ease-out forwards; }
+.ps-pillar img, .ps-ring img { width: 100%; height: auto; display: block; object-fit: contain; mix-blend-mode: screen; }
+@keyframes psPillar { 0% { transform: scaleY(0); opacity: 0; } 12% { transform: scaleY(1.05); opacity: 1; } 55% { opacity: .85; } 100% { transform: scaleY(1); opacity: 0; } }
+.ps-pill { position: absolute; left: var(--mx); top: var(--my); width: 0; height: 0; animation: psRise 1.2s cubic-bezier(.3,.7,.3,1) .15s both; }
+@keyframes psRise { from { transform: translateY(0); } to { transform: translateY(var(--rise)); } }
+.ps-pill .ps-img, .ps-pill .ico { position: absolute; left: 50%; top: 50%; width: 92px; height: 92px; translate: -50% -50%; object-fit: contain; z-index: 2; filter: drop-shadow(0 0 14px var(--c)) drop-shadow(0 0 4px #fff); animation: psSpin 2.4s linear infinite, psIn .5s ease-out .15s both; }
+.ps-pill .ico { width: 56px; height: 56px; font-size: 24px; }
+.pill-show.t3 .ps-pill .ps-img { width: 112px; height: 112px; }
+@keyframes psSpin { from { rotate: 0deg; } to { rotate: 360deg; } }
+@keyframes psIn { from { opacity: 0; scale: .3; } to { opacity: 1; scale: 1; } }
+.ps-ring { position: absolute; left: 50%; top: 38px; width: var(--ring); translate: -50% -50%; transform: scaleY(.38); opacity: 0; animation: psRing 1s ease-out 1.15s forwards, psRingSpin 9s linear 1.15s infinite; }
+@keyframes psRing { from { opacity: 0; scale: .3; } to { opacity: 1; scale: 1; } }
+@keyframes psRingSpin { to { rotate: 360deg; } }
+.ps-name { position: absolute; left: 0; right: 0; top: calc(var(--my) + var(--rise) + 70px); text-align: center; font-family: var(--brush); font-size: 22px; color: #fff4d6; letter-spacing: 2px; text-shadow: 0 0 10px var(--c), 0 2px 4px #000; opacity: 0; animation: psIn .5s ease-out 1.3s forwards; }
+.ps-name b { color: var(--c); font-size: 26px; font-weight: 400; }
+.pill-show { animation: psOut .5s ease-in calc(var(--stay) - 500ms) forwards; }
+@keyframes psOut { to { opacity: 0; } }
+
+/* ───── 關卡圖示 ───── */
+.li .ico.stage-ico { width: 46px; height: 46px; border-radius: 50%; position: relative; }
+.li .ico.stage-ico.img .item-ico { width: 100%; height: 100%; border-radius: 50%; filter: none; }
+.li .ico.stage-ico.img { box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent); }
+/* 目前可挑戰：外圈緩慢呼吸光 */
+.li .ico.stage-ico.cur { animation: stBreath 2.4s ease-in-out infinite; }
+@keyframes stBreath { 50% { box-shadow: 0 0 0 2px var(--c), 0 0 16px 3px color-mix(in srgb, var(--c) 70%, transparent); } }
+/* 未解鎖：灰階＋鎖頭（整列原本就降透明度） */
+.li .ico.stage-ico.locked .item-ico { filter: grayscale(1) brightness(.5); }
+.li .ico.stage-ico.locked::after { content: ""; position: absolute; right: -3px; bottom: -3px; width: 18px; height: 18px; border-radius: 50%; background: #0b121c center / 12px no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ccd2' stroke-width='2.4'%3E%3Crect x='5' y='11' width='14' height='10' rx='2' fill='%23c8ccd2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E"); box-shadow: 0 0 0 1px #4a5562; }
+/* 頭目關：紅金外圈微動效 */
+.li .ico.stage-ico.boss::before { content: ""; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none; background: conic-gradient(from 0deg, #ffd76a, #ff4a3a, transparent 35%, #ffd76a 50%, #ff4a3a, transparent 85%, #ffd76a); -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%); mask: radial-gradient(circle, transparent 62%, #000 64%); animation: swirl 4s linear infinite; opacity: .9; }
+.li .ico.stage-ico.boss.locked::before { opacity: .3; animation: none; }
+
+/* ───── 道侶・合修 ───── */
+.dao-form { display: flex; gap: 6px; margin: 6px 0 10px; }
+.dao-form input { flex: 1; min-width: 0; width: 0; padding: 8px; background: #0b121c; border: 1px solid var(--goldline); color: var(--paper); font-family: var(--brush); font-size: 15px; }
+.dao-gifts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.dao-gifts small { width: 100%; color: var(--dim); }
+.dao-gift { display: inline-flex; align-items: center; gap: 2px; padding: 4px 8px; font-size: 13px; color: var(--paper); background: rgba(255,158,196,.08); border: 1px solid rgba(255,158,196,.4); cursor: pointer; }
+.dao-gift b { color: #ff9ec4; margin-left: 4px; font-weight: 400; }
+.dao-room { cursor: pointer; }
+.dao-room.sel { box-shadow: inset 3px 0 0 #ff9ec4; background: rgba(255,158,196,.06); }
+.dao-styles, .dao-int { margin: 6px 0 2px; }
+.dao-int button small { display: block; font-size: 10px; color: var(--dim); }
+/* 雙修演出（畫面由外部素材提供；這裡只是框架與備援） */
+.dual-show { position: absolute; inset: 0; overflow: hidden; background: radial-gradient(ellipse at 50% 55%, #3a1830, #0a0610 75%); }
+.ds-bg { position: absolute; inset: 0; background: center / cover no-repeat; transition: background-image .6s; }
+.ds-art { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.dual-show::after { content: ""; position: absolute; inset: 55% 0 0; background: linear-gradient(transparent, rgba(8,4,12,.85) 70%); pointer-events: none; }   /* 底部文字襯底 */
+.ds-art img { width: 100%; height: 100%; object-fit: cover; animation: fadeIn .6s forwards; opacity: 0; }   /* 全幅、保持比例（多出的部分裁切） */
+.ds-video { position: absolute; inset: 0; background: #0a0610; }
+.ds-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ds-vskip { position: absolute; right: 10px; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 4px); z-index: 2; }
+.ds-ph { font-family: monospace; font-size: 12px; color: rgba(255,200,230,.55); text-align: center; line-height: 1.8; border: 1px dashed rgba(255,158,196,.35); padding: 14px; }
+.ds-top { z-index: 1; position: absolute; top: 7%; left: 0; right: 0; text-align: center; font-family: var(--brush); color: #ffe0ee; text-shadow: 0 0 12px #ff6aa8, 0 2px 4px #000; }
+.ds-top b { display: block; font-size: clamp(26px, 7vw, 38px); letter-spacing: .3em; font-weight: 400; }
+.ds-top span { font-size: 13px; letter-spacing: 3px; color: var(--dim); }
+@media (max-width: 359px) { .ds-top { top: calc(max(10px, env(safe-area-inset-top)) + 52px); } }   /* 窄螢幕：標題移到右上按鈕下方，避免重疊 */
+.ds-text { z-index: 1; position: absolute; left: 8%; right: 8%; bottom: 13%; text-align: center; font-family: var(--brush); font-size: 18px; line-height: 1.7; color: #fff4f8; text-shadow: 0 1px 4px #000; opacity: 0; }
+.ds-text.in { animation: fadeIn .8s forwards; }
+.ds-ctrl { position: absolute; right: 10px; top: calc(max(10px, env(safe-area-inset-top))); display: flex; gap: 6px; z-index: 2; }
+
+.t-cloud { right: auto; left: 16px; }
+.link-btn { background: none; border: none; color: #9fe8d8; text-decoration: underline; font-size: 12px; cursor: pointer; padding: 0 4px; }
+.dao-pid { color: #ff9ec4; letter-spacing: 2px; cursor: copy; }
+
+.char-yunxi #heroB { --lean: 3deg; }   /* 女角戰鬥立繪本身已是動態姿勢，前傾少一點 */
+/* 320 寬且 6 個技能：改成 3×2 兩排，每顆至少 44px（375/414 不受影響） */
+@media (max-width: 359px) {
+  .skills:has(> .skill:nth-child(6)) { grid-template-columns: repeat(3, 1fr); row-gap: 22px; padding: 4px 2px 0; }   /* 22px：留給第一排的技能名 */
+  .skills:has(> .skill:nth-child(6)) .skill { min-width: 44px; max-width: 48px; }
+  .skills:has(> .skill:nth-child(6)) + .row { margin-top: 22px !important; }   /* 第二排技能名在按鈕下方 18px */
+}
+.st-replay { position: absolute; left: 50%; top: calc(max(12px, env(safe-area-inset-top)) + 56px); transform: translateX(-50%); z-index: 6; margin: 0; padding: 5px 14px; border-radius: 999px; background: rgba(8,12,20,.72); white-space: nowrap; font-family: var(--serif); font-size: 13px; color: #f0e4c4; letter-spacing: 1px; pointer-events: none; }   /* 劇情回顧時的靈根測試 */
+body.busy { cursor: progress; }   /* 戰鬥進場前預載中 */
+/* 戰鬥立繪衣袖／衣擺擺動：裁出的複製層（座標見 ui.js SWAY）；攻擊、受擊時先藏起來，避免和本體動畫錯位；特效「關」停用 */
+.hfig > img.sway { position: absolute; left: 0; top: 0; width: 100%; height: 100%; filter: none !important; pointer-events: none; transform-origin: var(--o); animation: clothSway 3s ease-in-out infinite; }
+@keyframes clothSway { 0%, 100% { transform: rotate(calc(-0.8deg * var(--sa))) skewX(calc(-1deg * var(--sa))); } 50% { transform: rotate(calc(0.8deg * var(--sa))) skewX(calc(1deg * var(--sa))); } }
+.hero-b.atk img.sway, .hero-b.hurt img.sway, [data-fx="off"] .hfig > img.sway { display: none; }
+/* 劍氣光弧圖（assets/cast/arc.webp、assets/cast_yunxi/arc.webp）到位時取代 CSS 光弧，沿用同一段橫掃動畫 */
+.qi-sweep.img { width: 200px; height: 112px; border-radius: 0; background: center / contain no-repeat; -webkit-mask-image: none; mask-image: none; }   /* 原圖 16:9 黑底，靠 screen 混合去黑 */
+/* B2 機緣頁池名：位置由 UI.draw() 量 HUD 底部後設定（這裡的 top 只是量到之前的預設值）；320 寬字級再縮 */
+.banner.gpool { top: calc(max(10px, env(safe-area-inset-top)) + 70px); }
+.banner.gpool b { font-size: clamp(28px, 8vw, 46px); }
+@media (max-width: 359px) { .banner.gpool b { font-size: 22px; } .banner.gpool span { font-size: 12px; padding: 2px 18px; margin-top: 4px; } }
+/* B3 兵器詳情：展示框限高（內容由 CaseFit 等比縮放），「強化／突破」列不捲動就看得到 */
+#mBody .wcase { max-height: min(30vh, 300px); }
+/* 矮螢幕：展示框再縮、省掉和名牌重複的彈窗標題與說明文字 */
+@media (max-height: 640px) { #mBody .wcase { max-height: 16vh; } #modal:has(.wcase) #mTitle, #mBody .wc-fx { display: none; } #mBody .wc-stats span { padding: 2px 0; } #mBody .wc-stats b { font-size: 17px; } }
+/* B4 矮螢幕（例如 320×568）戰鬥：主角立繪縮到約 75% 並貼底，不蓋住妖物；劍身疊圖與劍光是立繪容器內的百分比座標，跟著一起縮 */
+@media (max-height: 640px) { #app.fighting #heroB { height: 30%; bottom: -2%; } #app.fighting #heroB.blean { height: 33%; } }
+/* B5 HUD：靈石數字不換行；320 寬以下靈根／戰力那行縮字、超出用省略號 */
+#hudRes .stone-amt, #hudRes span { white-space: nowrap; flex: none; }
+#hudRealm { min-width: 0; } #hudRealm > div { min-width: 0; }
+@media (max-width: 359px) { #hudRealm small { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+/* B8 矮螢幕機緣頁：場景縮小、「單抽／十連」移到保底列下方，第一屏就按得到 */
+@media (max-height: 640px) and (orientation: portrait) {
+  #app.tall.fit #controls { max-height: 74vh; }
+  #ctrlContent:has(> .gacha-btns) { display: flex; flex-direction: column; }
+  #ctrlContent > .pity-bar ~ * { order: 2; }
+  #ctrlContent > .pity-bar ~ .gacha-btns { order: 1; margin: 4px 0 8px; }
+  #ctrlContent:has(> .gacha-btns) .gpeek .wframe { width: 32px; height: 32px; }
+}
+/* N1 HUD 左側：靈根列永遠一行、超出省略；境界名不被靈石擠到。320 寬把右側印章、靈石圖示、境界字級都縮一級 */
+#hud { gap: 8px; }
+#hudRealm { flex: 0 1 auto; } #hudRes { flex: none; }
+#hudRealm small { text-wrap: nowrap; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* text-wrap 要一起設：前面的 text-wrap: balance 會讓它照樣換行 */
+#hudLv { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 359px) {
+  #hud { padding-left: 8px; padding-right: 8px; gap: 4px; } #hudRealm { gap: 5px; }
+  #hudRes .sealBtn { width: 34px; height: 34px; font-size: 16px; } #hudRes .stone-ico { width: 14px; height: auto; } #hudRes span { font-size: 15px; }
+  #hudRealm b { font-size: 16px; letter-spacing: 0; } #hudSeal { width: 24px; height: 24px; font-size: 15px; flex: none; }
+}
+/* N2 兵器詳情：佩戴按鈕在數值下方、強化列上方（不是 sticky）；橫向矮螢幕展示框縮到 80px */
+#mBody .row.weq { margin: 6px 0 8px; }
+@media (orientation: landscape) and (max-height: 640px) { #mBody .wcase { max-height: 80px; } #modal:has(.wcase) #mTitle, #mBody .wc-fx { display: none; } }
+/* N3 320 寬選角：介紹文字不被立繪壓住 */
+@media (max-width: 359px) { .ch-row.open .ch-intro { max-width: 52%; } .ch-row.open .ch-front { height: 85%; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 55%); mask-image: linear-gradient(90deg, transparent 0, #000 55%); } }
+/* N5 測靈根按鈕不斷字 */
+.root-card .seal { white-space: nowrap; }
+@media (max-width: 359px) { .root-card .seal { font-size: 15px; padding-left: 10px; padding-right: 10px; letter-spacing: 1px; } .root-card .row { gap: 8px; } }
+/* N6 橫向機緣頁：操作區底部留白，單抽／十連不被導覽蓋住 */
+@media (orientation: landscape) { #ctrlContent:has(> .gacha-btns) { padding-bottom: 24px; } }
+/* N8 道侶頁：登入鈕不斷字 */
+#dIn { white-space: nowrap; flex: none; }
+@media (max-width: 359px) { .dao-form:has(#dName) { flex-wrap: wrap; } .dao-form:has(#dName) input { flex: 1 1 100%; } .dao-form:has(#dName) .seal { margin-left: auto; } }   /* 320 寬：道號、編號上下兩列 */
+/* N9 320 寬戰鬥（技能兩排）：「自動施法」移到技能列右側直排，不捲動就按得到 */
+@media (max-width: 359px) {
+  #ctrlContent:has(.skills > .skill:nth-child(6)) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: center; }
+  #ctrlContent:has(.skills > .skill:nth-child(6)) > .bstat { grid-column: 1 / -1; }
+  #ctrlContent:has(.skills > .skill:nth-child(6)) > .bauto { margin: 0 !important; }
+  #ctrlContent:has(.skills > .skill:nth-child(6)) > .bauto .seal { writing-mode: vertical-rl; padding: 10px 7px; min-width: 0; letter-spacing: 2px; }
+}
+/* N10 320 寬：分頁上的任務數字改成小紅點，不壓到字 */
+.tabs .tl { position: relative; display: inline-block; } .tabs .tl .pip { top: -6px; right: -18px; }   /* 數字紅點掛在字的右上角外側 */
+@media (max-width: 359px) { .tabs .tl .pip { top: -3px; right: -10px; min-width: 0; width: 8px; height: 8px; padding: 0; font-size: 0; box-shadow: 0 0 5px var(--cinnabar2); } }
